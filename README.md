@@ -8,7 +8,7 @@
 ---
 
 ### 🎯 Descripción General
-**Geomapa SST FEN Perú** es una plataforma interactiva WebGIS (adaptable a computadora y celular) diseñada para especialistas en Seguridad y Salud en el Trabajo (SST), miembros de CSST, prevencionistas y gestores operativos a nivel nacional[cite: 2, 5].
+**Geomapa SST FEN Perú** es una plataforma interactiva WebGIS (adaptable a computadora y celular) diseñada para especialistas en Seguridad y Salud en el Trabajo (SST), miembros de CSST, prevencionistas y gestores operativos a nivel nacional.
 
 Su objetivo es facilitar la identificación temprana de peligros climáticos geolocalizando cualquier centro de trabajo o frente operativo sobre los **escenarios de riesgo de CENEPRED y puntos críticos**, traduciendo dicha exposición en medidas preventivas referenciales alineadas al **Protocolo de Seguridad y Salud en el Trabajo ante el Fenómeno El Niño (R.M. N.° 341-2026-TR)** del MTPE.
 
