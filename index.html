@@ -73,4 +73,189 @@
         <div class="user-actions">
             <button type="button" id="btnOpenNormativa" class="nav-icon-btn" title="Base Normativa y Guía">📘 <span class="btn-label-desktop">Guía</span></button>
             <span id="userEmailBadge" class="user-pill" title="Usuario autenticado">🟢 Conectado</span>
-            <button type="button" onclick
+            <button type="button" onclick="cerrarSesion()" class="nav-icon-btn btn-logout" title="Cerrar sesión">Salir</button>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div class="workspace-container">
+        
+        <!-- PANEL LATERAL IZQUIERDO (CONTROLES Y PUNTOS CRÍTICOS) -->
+        <aside id="sideDrawer" class="side-drawer">
+            <div class="drawer-mobile-handle" onclick="toggleSideDrawer()">
+                <span>☰ Capas y Puntos Críticos</span>
+                <span id="drawerToggleArrow">▲</span>
+            </div>
+
+            <div class="drawer-scroll-content">
+                <!-- SECCIÓN 1: CAPAS CARTOGRÁFICAS (TODAS DESACTIVADAS AL INICIO) -->
+                <section class="card-section">
+                    <div class="section-title-row">
+                        <h3>🗺️ Capas Temáticas (CENEPRED)</h3>
+                    </div>
+                    <div class="layer-list">
+                        <label class="layer-item">
+                            <input type="checkbox" id="chkDistritos">
+                            <span class="layer-dot" style="background:#64748b;"></span>
+                            <span>Límites Distritales (Lima y Callao)</span>
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="chkInundacion">
+                            <span class="layer-dot" style="background:#ea580c;"></span>
+                            <span>Escenario Inundaciones (CENEPRED)</span>
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="chkHuaycos">
+                            <span class="layer-dot" style="background:#dc2626;"></span>
+                            <span>Escenario Mov. en Masa (CENEPRED)</span>
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="chkRios">
+                            <span class="layer-dot" style="background:#0284c7;"></span>
+                            <span>Cuencas Ríos Rímac y Chillón</span>
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="chkPuntosCriticos">
+                            <span class="layer-dot" style="background:#b91c1c;"></span>
+                            <span>Puntos Críticos Viales (23 sectores)</span>
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="chkTopografia">
+                            <span class="layer-dot" style="background:#475569;"></span>
+                            <span>Relieve / Elevación MDE (Ráster)</span>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 2: FILTRO DE PUNTOS CRÍTICOS -->
+                <section class="card-section">
+                    <div class="section-title-row">
+                        <h3>⚠️ Puntos Críticos Identificados</h3>
+                        <span id="pcCounterBadge" class="count-badge">23</span>
+                    </div>
+                    <div class="filter-row">
+                        <input type="text" id="filterPcText" class="compact-input" placeholder="Filtrar por distrito o vía...">
+                        <select id="filterPcRisk" class="compact-input">
+                            <option value="">Todos los niveles</option>
+                            <option value="MUY ALTO">🔴 Muy Alto</option>
+                            <option value="ALTO">🟠 Alto</option>
+                            <option value="MEDIO">🟡 Medio</option>
+                        </select>
+                    </div>
+                    <div id="puntosCriticosList" class="pc-list-container"></div>
+                </section>
+
+                <!-- SECCIÓN 3: ACCESO A DOCUMENTACIÓN OFICIAL -->
+                <section class="card-section docs-card">
+                    <h3>📂 Documentación Oficial (Repo)</h3>
+                    <div class="doc-links">
+                        <a href="documentación/8777346-rm-n-341-2026-tr.pdf" target="_blank" class="doc-link-btn">📄 R.M. N.° 341-2026-TR (PDF)</a>
+                        <a href="documentación/8777346-protocolo-sst-ante-el-fen.pdf" target="_blank" class="doc-link-btn">📘 Protocolo SST FEN (PDF)</a>
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+        <!-- ÁREA DEL MAPA -->
+        <main class="map-viewport">
+            <div id="map"></div>
+
+            <!-- BANNER DE INSTRUCCIÓN RÁPIDA EN MAPA -->
+            <div id="mapHintBanner" class="map-hint-banner">
+                <span>💡 <strong>Toca cualquier punto del mapa</strong> o activa las capas temáticas en el panel izquierdo para visualizar los escenarios CENEPRED.</span>
+                <button type="button" onclick="this.parentElement.style.display='none'">&times;</button>
+            </div>
+
+            <!-- PANEL DE DIAGNÓSTICO SST EMERGENTE (FICHA TÉCNICA POR PUNTO) -->
+            <div id="diagnosticPanel" class="diagnostic-panel" style="display: none;">
+                <div class="diag-header">
+                    <div>
+                        <span class="diag-tag">DIAGNÓSTICO REFERENCIAL SST</span>
+                        <h2 id="diagDistritoTitle">Ubicación Seleccionada</h2>
+                    </div>
+                    <button type="button" class="diag-close" onclick="cerrarDiagnostico()">&times;</button>
+                </div>
+
+                <div class="diag-body">
+                    <div class="diag-meta" id="diagCoordsText">Lat: -12.0464 | Lon: -77.0428</div>
+                    <div class="diag-address" id="diagAddressText">Consultando referencia territorial...</div>
+
+                    <!-- TARJETAS SEMÁFORO CENEPRED -->
+                    <div class="risk-cards-grid">
+                        <div class="risk-card" id="cardInundacion">
+                            <span class="risk-card-label">Inundaciones (CENEPRED)</span>
+                            <strong class="risk-card-value" id="valInundacion">Evaluando...</strong>
+                        </div>
+                        <div class="risk-card" id="cardHuaycos">
+                            <span class="risk-card-label">Mov. en Masa (CENEPRED)</span>
+                            <strong class="risk-card-value" id="valHuaycos">Evaluando...</strong>
+                        </div>
+                    </div>
+
+                    <!-- INTERPRETACIÓN OPERATIVA R.M. N.° 341-2026-TR -->
+                    <div class="protocol-box">
+                        <div class="protocol-header">
+                            <strong>📋 Interpretación Operativa (R.M. N.° 341-2026-TR)</strong>
+                        </div>
+                        <div class="phase-tabs">
+                            <button type="button" class="phase-tab active" onclick="cambiarFaseTab('antes', this)">1. Antes</button>
+                            <button type="button" class="phase-tab" onclick="cambiarFaseTab('durante', this)">2. Durante</button>
+                            <button type="button" class="phase-tab" onclick="cambiarFaseTab('despues', this)">3. Después</button>
+                        </div>
+                        <div id="protocolContent" class="protocol-content"></div>
+                    </div>
+
+                    <div class="diag-actions">
+                        <button type="button" id="btnCopyReport" class="btn-copy-report" onclick="copiarDiagnosticoSST()">📋 Copiar Resumen para ATS / IPERC</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LEYENDA COMPACTA SST -->
+            <div class="map-legend-box">
+                <div class="legend-title" onclick="toggleLeyenda()">
+                    <span>Semáforo CENEPRED / SST</span>
+                    <span id="legendArrow">▼</span>
+                </div>
+                <div id="legendBody" class="legend-items">
+                    <div class="leg-row"><span class="leg-swatch" style="background:#dc2626;"></span>Muy Alto (Paralización / Evacuación)</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#ea580c;"></span>Alto (Controles Críticos)</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#eab308;"></span>Medio (Monitoreo Permanente)</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#16a34a;"></span>Bajo (Prevención Estándar)</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL GUÍA NORMATIVA -->
+    <div id="normativaModal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="disclaimer-card" style="max-width: 720px;">
+            <div class="disclaimer-header" style="background:#1e293b;">
+                <h3>📘 Guía Técnica y Base Normativa — Geomapa SST FEN Perú</h3>
+            </div>
+            <div class="disclaimer-body" style="max-height: 65vh; overflow-y: auto;">
+                <p><strong>Propósito de la Herramienta:</strong> Facilitar a empleadores, servicios de SST y Comités de Seguridad y Salud en el Trabajo (CSST) la identificación geográfica preliminar de exposición ante lluvias intensas, inundaciones y movimientos en masa en Lima Metropolitana y el Callao.</p>
+                <p><strong>Marco Legal Peruano Aplicable:</strong></p>
+                <ul style="padding-left: 18px; line-height: 1.6;">
+                    <li><strong>R.M. N.° 341-2026-TR:</strong> Protocolo de Seguridad y Salud en el Trabajo ante el Fenómeno El Niño (MTPE).</li>
+                    <li><strong>Ley N.° 29783 y D.S. N.° 005-2012-TR:</strong> Ley de Seguridad y Salud en el Trabajo (Art. 57 IPERC, Art. 63 Paralización por peligro inminente, Art. 83 Preparación y respuesta ante emergencias).</li>
+                    <li><strong>CENEPRED / SINAGERD:</strong> Escenarios de riesgo por lluvias intensas, inundaciones y movimientos en masa.</li>
+                </ul>
+                <p><strong>¿Cómo usar el Geomapa?</strong></p>
+                <ol style="padding-left: 18px; line-height: 1.6;">
+                    <li>Activa en el panel izquierdo las capas temáticas que desees visualizar (Distritos, Inundaciones, Movimientos en Masa, Ríos, Puntos Críticos o Relieve MDE).</li>
+                    <li>Escribe la dirección de tu centro de trabajo en la barra superior, usa tu GPS o haz clic/tap directamente sobre cualquier punto del mapa.</li>
+                    <li>Consulta las acciones obligatorias por fase (<em>Antes, Durante y Después</em>) y copia el diagnóstico para documentar tu ATS, IPERC o inspección preventiva.</li>
+                </ol>
+            </div>
+            <div class="disclaimer-footer">
+                <button type="button" style="background:#1e293b;" onclick="document.getElementById('normativaModal').style.display='none'">ENTENDIDO, VOLVER AL MAPA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
