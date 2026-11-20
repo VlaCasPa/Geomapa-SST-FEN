@@ -91,15 +91,22 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- 3. INICIALIZACIÓN DEL MAPA (DESPEJADO AL INICIO) ---
+// --- 3. INICIALIZACIÓN DEL MAPA EN ESCALA DE GRISES (ESTABLE Y SIN BLOQUEOS) ---
 const map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 11);
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
-L.tileLayer('[https://mt1.google.com/vt/lyrs=m@129&x=](https://mt1.google.com/vt/lyrs=m@129&x=){x}&y={y}&z={z}', {
-    attribution: '&copy; Google Maps | CENEPRED | MTPE R.M. N.° 341-2026-TR',
-    maxZoom: 20,
-    className: 'mapa-google-gris'
+// Capa base en escala de grises limpia y de alta disponibilidad
+const mapaBaseGris = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO | CENEPRED | MTPE R.M. N.° 341-2026-TR',
+    subdomains: 'abcd',
+    maxZoom: 20
 }).addTo(map);
+
+// Recalcular dimensiones del mapa al terminar de renderizar el layout de 3 columnas
+window.addEventListener('load', () => {
+    setTimeout(() => map.invalidateSize(), 200);
+});
+window.addEventListener('resize', () => map.invalidateSize());
 
 // --- 4. NORMALIZACIÓN DE COLORES SST ---
 function normalizarTexto(str) {
