@@ -1,13 +1,14 @@
 // ============================================================================
-// GEOMAPA SST FEN PERÚ — VISOR GEOESPACIAL Y CALCULADORA DE ESTRÉS TÉRMICO (9.1)
+// GEOMAPA SST FEN PERÚ — VISOR GEOESPACIAL, ESTRÉS TÉRMICO Y PROTOCOLO MTPE
+// Desarrollado por: Vladimir Casas Palomino
 // Base Normativa: Protocolo SST ante el Fenómeno El Niño (R.M. N.° 341-2026-TR)
 // ============================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// --- 1. CONFIGURACIÓN FIREBASE (PROYECTO: geomapa-sst-fen-peru) ---
+// --- 1. CONFIGURACIÓN FIREBASE Y ADMINISTRADOR ---
 const firebaseConfig = {
     apiKey: "AIzaSyA1Gq5BMmSG2DTtd9TlitOaXwJUC8wA5VI",
     authDomain: "geomapa-sst-fen-peru.firebaseapp.com",
@@ -18,12 +19,23 @@ const firebaseConfig = {
     measurementId: "G-NYXBLLZNH1"
 };
 
+// COLOCA AQUÍ TU CORREO EXACTAMENTE COMO APARECE EN TU CUENTA DE GOOGLE
+const ADMIN_EMAILS = [
+    "vlacaspa@gmail.com",
+    "tu_correo_admin@gmail.com"
+];
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 let currentUser = null;
+
+function esAdministrador(user) {
+    if (!user || !user.email) return false;
+    return ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(user.email.toLowerCase().trim());
+}
 
 // --- 2. AUTENTICACIÓN Y GOBERNANZA ---
 window.loginConGoogle = async function() {
@@ -49,6 +61,7 @@ window.aceptarDisclaimer = async function() {
     const disclaimerModal = document.getElementById('disclaimer-modal');
     if (disclaimerModal) disclaimerModal.style.display = 'none';
     sessionStorage.setItem('geomapa_disclaimer_ok', 'true');
+    setTimeout(() => map.invalidateSize(), 200);
 
     if (currentUser) {
         try {
@@ -66,11 +79,13 @@ onAuthStateChanged(auth, async (user) => {
     const loginModal = document.getElementById('login-modal');
     const disclaimerModal = document.getElementById('disclaimer-modal');
     const userBadge = document.getElementById('userEmailBadge');
+    const btnAdminInbox = document.getElementById('btnAdminInbox');
 
     if (user) {
         currentUser = user;
         if (loginModal) loginModal.style.display = 'none';
         if (userBadge) userBadge.textContent = `🟢 ${user.displayName || user.email}`;
+        if (btnAdminInbox) btnAdminInbox.style.display = esAdministrador(user) ? 'block' : 'none';
 
         let aceptado = sessionStorage.getItem('geomapa_disclaimer_ok') === 'true';
         if (!aceptado) {
@@ -82,16 +97,21 @@ onAuthStateChanged(auth, async (user) => {
                 }
             } catch (e) {}
         }
-        if (!aceptado && disclaimerModal) disclaimerModal.style.display = 'flex';
-        else if (disclaimerModal) disclaimerModal.style.display = 'none';
+        if (!aceptado && disclaimerModal) {
+            disclaimerModal.style.display = 'flex';
+        } else if (disclaimerModal) {
+            disclaimerModal.style.display = 'none';
+            setTimeout(() => map.invalidateSize(), 200);
+        }
     } else {
         currentUser = null;
         if (loginModal) loginModal.style.display = 'flex';
         if (disclaimerModal) disclaimerModal.style.display = 'none';
+        if (btnAdminInbox) btnAdminInbox.style.display = 'none';
     }
 });
 
-// --- 3. INICIALIZACIÓN DEL MAPA DE GOOGLE MAPS EN ESCALA DE GRISES ---
+// --- 3. INICIALIZACIÓN DEL MAPA DE GOOGLE MAPS EN ESCALA DE GRISES (BLINDADO) ---
 const map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 11);
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
@@ -101,7 +121,6 @@ const googleGrisLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y
     className: 'mapa-google-gris'
 }).addTo(map);
 
-// Forzar recalculo de tamaño del contenedor de 3 columnas para evitar pantalla gris
 window.addEventListener('load', () => {
     setTimeout(() => map.invalidateSize(), 250);
 });
@@ -237,34 +256,21 @@ fetch(baseUrl + 'RIOS%20RIMAC%20CHILLON.geojson')
         layerRios = L.geoJSON(data, { style: { color: '#0284c7', weight: 3, opacity: 0.85 } });
     });
 
-// --- 6. PUNTOS CRÍTICOS VIALES ---
-const puntosCriticosDataset = [
+// --- 6. PUNTOS CRÍTICOS VIALES (SINCRONIZADOS EN VIVO CON GOOGLE SHEETS CSV) ---
+const CSV_PUNTOS_CRITICOS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTiXs-tBRjj8n3K-FU17shsgTPd3_q7y6Xw2HE5prHH17hxxiWQS3Tj5yzBJmujmg/pub?output=csv';
+
+let puntosCriticosActivos = [
     { name: "Paso a Desnivel Javier Prado - Vía Expresa", dir: "Av. Javier Prado Este con Vía Expresa Paseo de la República", dist: "San Isidro / La Victoria", inun: "Muy Alto", huay: "Bajo", lat: -12.0883, lon: -77.0275 },
-    { name: "Paso a Desnivel Javier Prado - Gálvez Barrenechea", dir: "Av. Javier Prado Este con Av. José Gálvez Barrenechea", dist: "San Borja / San Isidro", inun: "Muy Alto", huay: "Bajo", lat: -12.0903, lon: -77.0142 },
-    { name: "Intercambio Panamericana Norte - San Juan de Dios", dir: "Autopista Panamericana Norte con Av. San Juan de Dios", dist: "Puente Piedra", inun: "Muy Alto", huay: "Bajo", lat: -11.8596, lon: -77.0754 },
-    { name: "Intercambio Separadora Industrial - Velasco Alvarado", dir: "Av. Separadora Industrial con Av. Juan Velasco Alvarado", dist: "Villa El Salvador", inun: "Alto", huay: "Bajo", lat: -12.2036, lon: -76.9388 },
-    { name: "Intercambio Panamericana Norte - Universitaria", dir: "Av. Universitaria con Autopista Panamericana Norte", dist: "Los Olivos / SMP", inun: "Muy Alto", huay: "Bajo", lat: -11.9664, lon: -77.0706 },
-    { name: "Intercambio Universitaria - Línea Amarilla (Río Rímac)", dir: "Av. Universitaria con Vía Expresa Línea Amarilla", dist: "Lima / SMP", inun: "Muy Alto", huay: "Bajo", lat: -12.0461, lon: -77.0735 },
-    { name: "Bajada Malecón de la Marina (Acceso Costa Verde)", dir: "Av. Del Ejército / Bajada Malecón de la Marina", dist: "Miraflores", inun: "Alto", huay: "Medio", lat: -12.1221, lon: -77.0383 },
-    { name: "Bypass 28 de Julio - Arequipa", dir: "Av. 28 de Julio con Av. Arequipa y Garcilaso", dist: "Lima (Cercado)", inun: "Muy Alto", huay: "Bajo", lat: -12.0642, lon: -77.0366 },
-    { name: "Bypass 28 de Julio - Vía Expresa", dir: "Av. 28 de Julio con Paseo de la República", dist: "Lima / La Victoria", inun: "Muy Alto", huay: "Bajo", lat: -12.0649, lon: -77.0328 },
-    { name: "Bypass Alfonso Ugarte - Argentina", dir: "Plaza Ramón Castilla (Av. Alfonso Ugarte / Argentina)", dist: "Lima (Cercado)", inun: "Muy Alto", huay: "Bajo", lat: -12.0436, lon: -77.0425 },
-    { name: "Paso a Desnivel Angamos Este - San Luis", dir: "Av. Angamos Este con Av. San Luis", dist: "San Borja", inun: "Alto", huay: "Bajo", lat: -12.1107, lon: -77.0006 },
-    { name: "Intercambio Benavides - Panamericana Sur", dir: "Av. Alfredo Benavides con Panamericana Sur", dist: "Santiago de Surco", inun: "Muy Alto", huay: "Bajo", lat: -12.1292, lon: -76.9806 },
-    { name: "Bypass Brasil - La Marina", dir: "Av. Brasil con Av. La Marina y Javier Prado Oeste", dist: "Magdalena / Jesús María", inun: "Muy Alto", huay: "Bajo", lat: -12.0837, lon: -77.0682 },
-    { name: "Intercambio Mateo Pumacahua - Panamericana Sur", dir: "Av. Mateo Pumacahua con Panamericana Sur", dist: "Chorrillos / VES", inun: "Muy Alto", huay: "Bajo", lat: -12.1889, lon: -76.9667 },
-    { name: "Bypass Javier Prado - Arequipa", dir: "Av. Javier Prado Oeste con Av. Arequipa", dist: "San Isidro", inun: "Muy Alto", huay: "Bajo", lat: -12.0911, lon: -77.0319 },
-    { name: "Bypass México - Vía Expresa", dir: "Av. México con Vía Expresa Paseo de la República", dist: "La Victoria", inun: "Muy Alto", huay: "Bajo", lat: -12.0747, lon: -77.0289 },
-    { name: "Bypass Tingo María - Venezuela", dir: "Av. Tingo María con Av. Venezuela", dist: "Breña / Lima", inun: "Muy Alto", huay: "Bajo", lat: -12.0601, lon: -77.0603 },
-    { name: "Bypass Néstor Gambetta - Acceso Aeropuerto", dir: "Av. Néstor Gambetta con cruce ramal Aeropuerto", dist: "Callao", inun: "Muy Alto", huay: "Bajo", lat: -12.0135, lon: -77.1189 },
-    { name: "Paso a Desnivel Óvalo Pachacútec", dir: "Óvalo Pachacútec con Av. 26 de Noviembre", dist: "Villa María del Triunfo", inun: "Muy Alto", huay: "Medio", lat: -12.1648, lon: -76.9298 },
-    { name: "Intercambio Vía de Evitamiento - Prol. Tacna", dir: "Vía de Evitamiento con Puente Santa Rosa", dist: "Rímac / Lima", inun: "Muy Alto", huay: "Bajo", lat: -12.0378, lon: -77.0317 },
-    { name: "Intercambio Nuevo Aeropuerto - Morales Duárez", dir: "Av. Elmer Faucett con Av. Morales Duárez", dist: "Callao / Carmen de la Legua", inun: "Muy Alto", huay: "Bajo", lat: -12.0304, lon: -77.1065 },
-    { name: "Intercambio Ramiro Prialé - Huachipa", dir: "Autopista Ramiro Prialé con Av. Las Torres", dist: "Ate / Lurigancho-Chosica", inun: "Muy Alto", huay: "Alto", lat: -12.0320, lon: -76.9266 },
-    { name: "Paso a Desnivel Prol. Javier Prado - Carretera Central", dir: "Av. Prolongación Javier Prado con Av. Nicolás Ayllón", dist: "Ate", inun: "Muy Alto", huay: "Muy Alto", lat: -12.0463, lon: -76.9382 }
+    { name: "Bypass 28 de Julio - Arequipa", dir: "Av. 28 de Julio con Av. Arequipa", dist: "Lima (Cercado)", inun: "Muy Alto", huay: "Bajo", lat: -12.0642, lon: -77.0366 },
+    { name: "Intercambio Ramiro Prialé - Huachipa", dir: "Autopista Ramiro Prialé con Av. Las Torres", dist: "Ate / Lurigancho-Chosica", inun: "Muy Alto", huay: "Alto", lat: -12.0320, lon: -76.9266 }
 ];
 
-function renderizarPuntosCriticos(filtrados = puntosCriticosDataset) {
+function parsearCoordDecimal(val) {
+    if (val === undefined || val === null) return NaN;
+    return parseFloat(String(val).trim().replace(',', '.'));
+}
+
+function renderizarPuntosCriticos(filtrados = puntosCriticosActivos) {
     layerPuntosCriticos.clearLayers();
     const listContainer = document.getElementById('puntosCriticosList');
     const badge = document.getElementById('pcCounterBadge');
@@ -298,7 +304,7 @@ function renderizarPuntosCriticos(filtrados = puntosCriticosDataset) {
                 <div class="pc-item-title">${pt.name}</div>
                 <div class="pc-item-sub">
                     <span>${pt.dist}</span>
-                    <strong style="color:${getColorPeligro(pt.inun)}">${pt.inun.toUpperCase()}</strong>
+                    <strong style="color:${getColorPeligro(pt.inun)}">${(pt.inun || 'N/D').toUpperCase()}</strong>
                 </div>
             `;
             card.addEventListener('click', () => {
@@ -320,12 +326,72 @@ function renderizarPuntosCriticos(filtrados = puntosCriticosDataset) {
         }
     });
 }
+
+function sincronizarPuntosCriticosCSV() {
+    if (typeof Papa === 'undefined') {
+        setTimeout(sincronizarPuntosCriticosCSV, 150);
+        return;
+    }
+    Papa.parse(CSV_PUNTOS_CRITICOS_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            const remotos = [];
+            results.data.forEach(row => {
+                const keys = Object.keys(row);
+                const nameKey = keys.find(k => {
+                    const nk = normalizarTexto(k);
+                    return nk.includes('PASO A DESNIVEL') || nk.includes('INTERCAMBIO') || nk.includes('NOMBRE') || nk.includes('PUNTO') || nk.includes('SECTOR');
+                }) || keys[1] || keys[0];
+                const dirKey = keys.find(k => {
+                    const nk = normalizarTexto(k);
+                    return nk.includes('DIRECCION') || nk.includes('INTERSECCION') || nk.includes('UBICACION') || nk.includes('REFERENCIA');
+                }) || keys[2];
+                const distKey = keys.find(k => normalizarTexto(k).includes('DISTRITO')) || keys[3];
+                const inunKey = keys.find(k => normalizarTexto(k).includes('INUNDACION')) || keys[4];
+                const huayKey = keys.find(k => {
+                    const nk = normalizarTexto(k);
+                    return nk.includes('HUAYCO') || nk.includes('MASA') || nk.includes('MOV');
+                }) || keys[5];
+                const latKey = keys.find(k => normalizarTexto(k).includes('LAT')) || keys[6];
+                const lonKey = keys.find(k => normalizarTexto(k).includes('LON')) || keys[7];
+
+                const lat = parsearCoordDecimal(row[latKey]);
+                const lon = parsearCoordDecimal(row[lonKey]);
+                const nombre = String(row[nameKey] || '').trim();
+
+                if (!nombre || isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+
+                remotos.push({
+                    name: nombre,
+                    dir: String(row[dirKey] || 'Referencia vial Lima/Callao').trim(),
+                    dist: String(row[distKey] || 'Lima / Callao').trim(),
+                    inun: String(row[inunKey] || 'Alto').trim(),
+                    huay: String(row[huayKey] || 'Bajo').trim(),
+                    lat,
+                    lon
+                });
+            });
+
+            if (remotos.length > 0) {
+                puntosCriticosActivos = remotos;
+                filtrarPuntosCriticos();
+            }
+        },
+        error: function(err) {
+            console.warn("Usando respaldo local de Puntos Críticos:", err);
+            renderizarPuntosCriticos();
+        }
+    });
+}
 renderizarPuntosCriticos();
+sincronizarPuntosCriticosCSV();
 
 function filtrarPuntosCriticos() {
     const txt = normalizarTexto(document.getElementById('filterPcText')?.value || '');
     const risk = normalizarTexto(document.getElementById('filterPcRisk')?.value || '');
-    const filtrados = puntosCriticosDataset.filter(pt => {
+    const filtrados = puntosCriticosActivos.filter(pt => {
         const matchTxt = !txt || normalizarTexto(pt.name).includes(txt) || normalizarTexto(pt.dist).includes(txt) || normalizarTexto(pt.dir).includes(txt);
         const matchRisk = !risk || obtenerNivelEstandar(pt.inun) === risk || obtenerNivelEstandar(pt.huay) === risk;
         return matchTxt && matchRisk;
@@ -479,12 +545,11 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
     };
     window.cambiarFaseTab(faseActual, document.querySelector('.phase-tab.active'));
 
-    // Sincronizar también clima en el panel derecho de Estrés Térmico
     cargarClimaPuntoActual(true);
 
     if (!opciones.direccion) {
         try {
-            const resp = await fetch(`[https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$](https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$){lat}&lon=${lng}`);
+            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
             const data = await resp.json();
             const dir = data.display_name || `Sector ${distritoDetectado}`;
             document.getElementById('diagAddressText').textContent = dir;
@@ -530,31 +595,28 @@ window.copiarDiagnosticoSST = function() {
 };
 
 // ============================================================================
-// 9. CALCULADORA OFICIAL DE ESTRÉS TÉRMICO POR CALOR (NUMERAL 9.1 PROTOCOLO)
+// 9. CALCULADORA OFICIAL DE ESTRÉS TÉRMICO POR CALOR (NUMERAL 9.1)
 // ============================================================================
-let modoTermicoActual = 'hi'; // 'hi' (Índice de Calor NWS) | 'tgbh' (TGBH Efectivo)
+let modoTermicoActual = 'hi';
 let ultimoReporteTermico = '';
 
 window.cambiarModoTermico = function(modo, btnEl) {
     modoTermicoActual = modo;
     document.querySelectorAll('.t-mode-btn').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
-
     document.getElementById('formIndiceCalor').style.display = (modo === 'hi') ? 'block' : 'none';
     document.getElementById('formTGBH').style.display = (modo === 'tgbh') ? 'block' : 'none';
-
     if (modo === 'hi') calcularIndiceCalor();
     else calcularTGBH();
 };
 
-// Obtención de temperatura y humedad actual del punto seleccionado (Open-Meteo API sin CORS)
 window.cargarClimaPuntoActual = async function(silencioso = false) {
     const noteEl = document.getElementById('weatherSourceNote');
     const { lat, lng, distrito } = puntoSeleccionadoActual;
     if (noteEl) noteEl.textContent = `Consultando condiciones meteorológicas en ${distrito}...`;
 
     try {
-        const url = `[https://api.open-meteo.com/v1/forecast?latitude=$](https://api.open-meteo.com/v1/forecast?latitude=$){lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=temperature_2m,relative_humidity_2m&timezone=America%2FLima`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=temperature_2m,relative_humidity_2m&timezone=America%2FLima`;
         const res = await fetch(url);
         const data = await res.json();
         if (data && data.current) {
@@ -568,99 +630,73 @@ window.cargarClimaPuntoActual = async function(silencioso = false) {
             if (modoTermicoActual === 'hi') calcularIndiceCalor();
         }
     } catch (e) {
-        if (!silencioso && noteEl) {
-            noteEl.textContent = "⚠️ No se pudo sincronizar automáticamente. Ingrese los valores de SENAMHI manualmente.";
-        }
+        if (!silencioso && noteEl) noteEl.textContent = "⚠️ Ingrese los valores de SENAMHI manualmente.";
     }
 };
 
-// Ecuación oficial de regresión de Rothfusz (NWS / NOAA) en °C
 function calcularRothfuszCelsius(tempC, rh) {
-    const T = (tempC * 9 / 5) + 32; // Convertir °C a °F
+    const T = (tempC * 9 / 5) + 32;
     const R = rh;
-
-    // Fórmula simple de Steadman si T < 80°F
     let HI = 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (R * 0.094));
-
     if ((HI + T) / 2 >= 80.0) {
         HI = -42.379 + 2.04901523 * T + 10.14333127 * R
              - 0.22475541 * T * R - 0.00683783 * T * T
              - 0.05481717 * R * R + 0.00122874 * T * T * R
              + 0.00085282 * T * R * R - 0.00000199 * T * T * R * R;
-
-        // Ajuste por baja humedad (< 13% y 80°F <= T <= 112°F)
         if (R < 13 && T >= 80 && T <= 112) {
             HI -= ((13 - R) / 4) * Math.sqrt((17 - Math.abs(T - 95.0)) / 17);
-        }
-        // Ajuste por alta humedad (> 85% y 80°F <= T <= 87°F)
-        else if (R > 85 && T >= 80 && T <= 87) {
+        } else if (R > 85 && T >= 80 && T <= 87) {
             HI += ((R - 85) / 10) * ((87 - T) / 5);
         }
     }
-
-    return (HI - 32) * 5 / 9; // Regresar a °C
+    return (HI - 32) * 5 / 9;
 }
 
-// Clasificación oficial según Tabla 4 del Protocolo MTPE (R.M. N.° 341-2026-TR)
 function interpretarTabla4IndiceCalor(hiEfectivo) {
     if (hiEfectivo >= 51.7) {
         return {
-            nivel: "RIESGO MUY ALTO",
-            color: "#dc2626",
-            textColor: "#ffffff",
-            salud: "Condiciones de calor extremo, con riesgo muy elevado de enfermedad grave por calor (golpe de calor fulminante).",
+            nivel: "RIESGO MUY ALTO", color: "#dc2626", textColor: "#ffffff",
+            salud: "Condiciones de calor extremo, con riesgo muy elevado de enfermedad grave por calor.",
             controles: [
                 "Evitar la exposición no controlada; suspender o reprogramar las tareas que no puedan ejecutarse con controles eficaces.",
-                "Aplicar paralización preventiva por peligro grave e inminente (Ley N.° 29783, Art. 63) si no hay climatización o sombra efectiva.",
+                "Aplicar paralización preventiva por peligro inminente (Ley N.° 29783, Art. 63) si no hay controles eficaces.",
                 "Considerar los límites correspondientes al tipo de trabajo y la aclimatación (Tabla 3)."
             ]
         };
     } else if (hiEfectivo >= 39.4) {
         return {
-            nivel: "RIESGO ALTO",
-            color: "#ea580c",
-            textColor: "#ffffff",
+            nivel: "RIESGO ALTO", color: "#ea580c", textColor: "#ffffff",
             salud: "Aumenta considerablemente la posibilidad de calambres y agotamiento por calor; puede presentarse golpe de calor.",
             controles: [
-                "Aplicar controles intensificados, reducir la duración de la exposición y disminuir la carga física.",
-                "Establecer ciclos obligatorios de trabajo/descanso en áreas frescas o sombreadas e hidratación permanente.",
+                "Aplicar controles intensificados, reducir la duración de la exposición y la carga física.",
+                "Establecer ciclos obligatorios de trabajo/descanso en áreas frescas e hidratación permanente.",
                 "Considerar los límites correspondientes al tipo de trabajo y la aclimatación (Tabla 3)."
             ]
         };
     } else if (hiEfectivo >= 32.2) {
         return {
-            nivel: "RIESGO MEDIO",
-            color: "#eab308",
-            textColor: "#0f172a",
+            nivel: "RIESGO MEDIO", color: "#eab308", textColor: "#0f172a",
             salud: "Posibles calambres, agotamiento por calor y golpe de calor, especialmente con esfuerzo físico o exposición prolongada.",
             controles: [
-                "Incrementar las pausas en lugares frescos, reducir el esfuerzo físico y reforzar la supervisión en campo.",
-                "Garantizar puntos de hidratación con agua fresca a menos de 50 metros y uso de bloqueador solar FPS 50+.",
+                "Incrementar las pausas en lugares frescos, reducir el esfuerzo físico y reforzar la supervisión.",
+                "Garantizar puntos de hidratación con agua fresca y protección solar.",
                 "Considerar los límites correspondientes al tipo de trabajo y la aclimatación (Tabla 3)."
             ]
         };
     } else if (hiEfectivo >= 26.7) {
         return {
-            nivel: "RIESGO BAJO",
-            color: "#16a34a",
-            textColor: "#ffffff",
+            nivel: "RIESGO BAJO", color: "#16a34a", textColor: "#ffffff",
             salud: "Puede aparecer fatiga con exposición prolongada o esfuerzo físico.",
             controles: [
-                "Mantener agua potable disponible, áreas de sombra, vigilancia de síntomas tempranos y pausas apropiadas.",
-                "Considerar la carga física de la tarea y el estado de aclimatación del trabajador.",
-                "Suministrar ropa transpirable y protección contra radiación UV (Ley N.° 30102)."
+                "Mantener agua potable, sombra, vigilancia de síntomas y pausas apropiadas.",
+                "Considerar la carga física y la aclimatación."
             ]
         };
     } else {
         return {
-            nivel: "CONFORT / SIN ALERTA",
-            color: "#0284c7",
-            textColor: "#ffffff",
+            nivel: "CONFORT / SIN ALERTA", color: "#0284c7", textColor: "#ffffff",
             salud: "Condición térmica por debajo del umbral de precaución (26,7 °C).",
-            controles: [
-                "Mantener hidratación regular y medidas estándar de protección solar si se labora a la intemperie.",
-                "Monitorear variaciones térmicas hacia el mediodía."
-            ]
+            controles: ["Mantener hidratación regular y medidas estándar de protección solar en exteriores."]
         };
     }
 }
@@ -669,13 +705,10 @@ window.calcularIndiceCalor = function() {
     const tempC = parseFloat(document.getElementById('hiTempC').value);
     const rh = parseFloat(document.getElementById('hiHumidity').value);
     const solDirecto = document.getElementById('hiDirectSun').checked;
-
     if (isNaN(tempC) || isNaN(rh)) return;
 
     const hiSombra = calcularRothfuszCelsius(tempC, rh);
-    const ajusteSolar = solDirecto ? 8.3 : 0.0;
-    const hiEfectivo = hiSombra + ajusteSolar;
-
+    const hiEfectivo = hiSombra + (solDirecto ? 8.3 : 0.0);
     const evalT4 = interpretarTabla4IndiceCalor(hiEfectivo);
 
     const banner = document.getElementById('thermalBanner');
@@ -687,27 +720,22 @@ window.calcularIndiceCalor = function() {
     document.getElementById('thermalSubValue').textContent = solDirecto
         ? `Sombra: ${hiSombra.toFixed(1)} °C + 8.3 °C (sol directo)`
         : `Condición bajo sombra (sin ajuste solar)`;
-
     document.getElementById('thermalRiskBadge').textContent = evalT4.nivel;
     document.getElementById('tgbhActionBox').style.display = 'none';
     document.getElementById('thermalHealthText').textContent = evalT4.salud;
-
-    const listEl = document.getElementById('thermalControlsList');
-    listEl.innerHTML = evalT4.controles.map(c => `<li>${c}</li>`).join('');
+    document.getElementById('thermalControlsList').innerHTML = evalT4.controles.map(c => `<li>${c}</li>`).join('');
 
     ultimoReporteTermico = [
         `EVALUACIÓN DE ESTRÉS TÉRMICO — PROTOCOLO MTPE (R.M. N.° 341-2026-TR - NUMERAL 9.1)`,
         `Fecha/Hora: ${new Date().toLocaleString('es-PE')}`,
         `Sector: ${puntoSeleccionadoActual.distrito} (${puntoSeleccionadoActual.lat.toFixed(4)}, ${puntoSeleccionadoActual.lng.toFixed(4)})`,
         `Método: Opción 2 - Índice de Calor (NWS/NOAA)`,
-        `Datos ingresados: Temp. Aire = ${tempC.toFixed(1)} °C | Humedad Relativa = ${rh}% | Sol directo = ${solDirecto ? 'Sí (+8.3 °C)' : 'No'}`,
+        `Datos: Temp=${tempC.toFixed(1)}°C | HR=${rh}% | Sol directo=${solDirecto ? 'Sí (+8.3°C)' : 'No'}`,
         `Resultado: Índice de Calor Efectivo = ${hiEfectivo.toFixed(1)} °C (${evalT4.nivel})`,
-        `Impacto en Salud: ${evalT4.salud}`,
-        `Medidas de Control: ${evalT4.controles.join(' | ')}`
+        `Medidas: ${evalT4.controles.join(' | ')}`
     ].join('\n');
 };
 
-// Cálculo Opción 1: TGBH y TGBH Efectivo (R.M. N.° 375-2008-TR + Tablas 2 y 3)
 const limitesTabla3 = {
     ligero:    { no: 28, si: 30, nombre: "Ligero",     decision: "Al alcanzar el valor aplicable, evaluar y reforzar los controles; no asumir que la tarea es segura solo por ser ligera." },
     moderado:  { no: 25, si: 28, nombre: "Moderado",   decision: "Reducir la exposición térmica, organizar pausas y reevaluar la tarea." },
@@ -726,24 +754,16 @@ window.calcularTGBH = function() {
 
     document.getElementById('fieldTBS').style.opacity = (cond === 'sol') ? '1' : '0.45';
 
-    const tgbhBase = (cond === 'sol')
-        ? (0.7 * tbh + 0.2 * tg + 0.1 * tbs)
-        : (0.7 * tbh + 0.3 * tg);
-
+    const tgbhBase = (cond === 'sol') ? (0.7 * tbh + 0.2 * tg + 0.1 * tbs) : (0.7 * tbh + 0.3 * tg);
     const tgbhEfectivo = tgbhBase + cav;
     const infoCarga = limitesTabla3[cargaKey];
     const valorAccion = (aclim === 'si') ? infoCarga.si : infoCarga.no;
     const superaLimite = tgbhEfectivo >= valorAccion;
 
-    // Clasificación visual comunicacional (Tabla 1 del Protocolo)
-    let nivelColor = "#16a34a", textColor = "#ffffff", nivelLabel = "RIESGO BAJO (< 21 °C)";
-    if (tgbhEfectivo > 28) {
-        nivelColor = "#dc2626"; nivelLabel = "RIESGO MUY ALTO (> 28 °C)";
-    } else if (tgbhEfectivo >= 25) {
-        nivelColor = "#ea580c"; nivelLabel = "RIESGO ALTO (25–28 °C)";
-    } else if (tgbhEfectivo >= 21) {
-        nivelColor = "#eab308"; textColor = "#0f172a"; nivelLabel = "RIESGO MEDIO (21–25 °C)";
-    }
+    let nivelColor = "#16a34a", textColor = "#ffffff";
+    if (tgbhEfectivo > 28) nivelColor = "#dc2626";
+    else if (tgbhEfectivo >= 25) nivelColor = "#ea580c";
+    else if (tgbhEfectivo >= 21) { nivelColor = "#eab308"; textColor = "#0f172a"; }
 
     const banner = document.getElementById('thermalBanner');
     banner.style.backgroundColor = nivelColor;
@@ -751,7 +771,7 @@ window.calcularTGBH = function() {
 
     document.getElementById('thermalMethodLabel').textContent = "TGBH EFECTIVO (R.M. N.° 375-2008-TR)";
     document.getElementById('thermalMainValue').textContent = `${tgbhEfectivo.toFixed(1)} °C`;
-    document.getElementById('thermalSubValue').textContent = `TGBH medido: ${tgbhBase.toFixed(1)} °C + Ajuste ropa/EPP: +${cav} °C`;
+    document.getElementById('thermalSubValue').textContent = `TGBH base: ${tgbhBase.toFixed(1)} °C + Ropa/EPP: +${cav} °C`;
     document.getElementById('thermalRiskBadge').textContent = superaLimite ? "⚠️ SUPERA VALOR ACCIÓN" : "✅ DENTRO DE LÍMITE";
 
     const actionBox = document.getElementById('tgbhActionBox');
@@ -766,21 +786,18 @@ window.calcularTGBH = function() {
 
     const controles = [
         `Decisión Preventiva (Tabla 3): ${infoCarga.decision}`,
-        "Suministrar hidratación fresca permanente (electrolitos/agua potable) y habilitar estaciones de sombra ventiladas.",
-        "Implementar programa de aclimatación gradual (7 a 14 días) para personal nuevo o que retorna tras ausencia.",
-        "Vigilar síntomas de alerta temprana (mareos, sudoración excesiva o piel seca/caliente, cefalea, confusión)."
+        "Suministrar hidratación fresca permanente y habilitar estaciones de sombra ventiladas.",
+        "Implementar programa de aclimatación gradual y vigilancia de síntomas de alerta temprana."
     ];
-
     document.getElementById('thermalControlsList').innerHTML = controles.map(c => `<li>${c}</li>`).join('');
 
     ultimoReporteTermico = [
         `EVALUACIÓN TGBH EFECTIVO — R.M. N.° 375-2008-TR / PROTOCOLO FEN (R.M. N.° 341-2026-TR)`,
         `Fecha/Hora: ${new Date().toLocaleString('es-PE')}`,
         `Sector: ${puntoSeleccionadoActual.distrito}`,
-        `Mediciones: TBH=${tbh}°C, TG=${tg}°C, TBS=${tbs}°C (${cond === 'sol' ? 'Con carga solar' : 'Sin carga solar'})`,
-        `TGBH Base = ${tgbhBase.toFixed(1)} °C | Ajuste Ropa/EPP = +${cav} °C | TGBH Efectivo = ${tgbhEfectivo.toFixed(1)} °C`,
-        `Criterio Tabla 3: Trabajo ${infoCarga.nombre} (${aclim === 'si' ? 'Aclimatado' : 'No aclimatado'}) -> Valor de acción: ${valorAccion} °C (${superaLimite ? 'SUPERA LÍMITE' : 'CUMPLE'})`,
-        `Decisión Preventiva: ${infoCarga.decision}`
+        `TGBH Base=${tgbhBase.toFixed(1)}°C | Ajuste Ropa=+${cav}°C | TGBH Efectivo=${tgbhEfectivo.toFixed(1)}°C`,
+        `Tabla 3: Trabajo ${infoCarga.nombre} (${aclim === 'si' ? 'Aclimatado' : 'No aclimatado'}) -> Límite: ${valorAccion}°C (${superaLimite ? 'SUPERA' : 'CUMPLE'})`,
+        `Decisión: ${infoCarga.decision}`
     ].join('\n');
 };
 
@@ -794,14 +811,269 @@ window.copiarReporteTermico = function() {
     });
 };
 
+calcularIndiceCalor();
+
+// ============================================================================
+// 10. DASHBOARD LINEAMIENTOS TÉCNICOS POR RIESGO (NUMERAL 9 + NUMERAL 11)
+// ============================================================================
+const LINEAMIENTOS_NUMERAL9 = [
+    { num: "9.1", riesgo: "Estrés térmico por calor", peligro: "Exposición a altas temperaturas, humedad, carga metabólica y ropa/EPP restrictiva.", controles: "Evaluación TGBH/Índice de calor, sombra, agua potable fresca, plan de aclimatación y ciclos trabajo-descanso.", epp: "Ropa ligera transpirable y EPP compatible con el calor previsto.", retorno: "Evaluación ambiental y controles restablecidos; tareas, pausas, hidratación y sombra ajustadas a condiciones reales." },
+    { num: "9.2", riesgo: "Radiación UV solar", peligro: "Exposición solar ocupacional en exteriores (criterio preventivo UVI >= 3).", controles: "Programación fuera de horas pico, zonas de sombra, rotación de personal e hidratación.", epp: "Ropa manga larga, sombrero ala ancha o casco con cortaviento/nuca, lentes con filtro UV y bloqueador solar amplio espectro.", retorno: "Controles solares verificados antes de reanudar labores exteriores; ropa, lentes y protector solar disponibles." },
+    { num: "9.3", riesgo: "Sustancias químicas", peligro: "Derrames por desplazamiento de envases, contacto, inhalación o incendio.", controles: "Contención secundaria, sujeción de envases, inventario, Fichas de Datos de Seguridad (FDS) y respuesta especializada.", epp: "Guantes, ropa y botas resistentes a químicos; protección ocular/facial y respiratoria según evaluación.", retorno: "Derrames controlados, sustancias identificadas, áreas ventiladas y residuos gestionados por personal entrenado." },
+    { num: "9.4", riesgo: "Agentes biológicos", peligro: "Microorganismos (virus, bacterias, hongos) en agua contaminada, lodos, mohos, residuos orgánicos y vectores.", controles: "Plan de higiene, control de vectores/plagas, vacunación según evaluación sanitaria, secado y limpieza segura.", epp: "Guantes, ropa de protección, botas impermeables, protección ocular/facial y respirador según agente.", retorno: "Limpieza, secado/desinfección y gestión de residuos completadas; vigilancia de la salud implementada." },
+    { num: "9.5", riesgo: "Aguas residuales y lodos", peligro: "Contacto dérmico, ocular o respiratorio por reboses o inundaciones de aguas servidas.", controles: "Barreras en puntos de ingreso, aislamiento, extracción mecánica, separación de áreas limpias/sucias y desinfección.", epp: "Guantes impermeables, botas caña alta antideslizantes, ropa impermeable, protección ocular/facial y respiratoria.", retorno: "Limpieza, secado, desinfección y gestión de residuos verificadas antes de controlar el reingreso." },
+    { num: "9.6", riesgo: "Riesgo eléctrico en inundaciones", peligro: "Electrocución, arco eléctrico o incendio por instalaciones energizadas en contacto con agua.", controles: "Aislar circuitos críticos, bloqueo y etiquetado (LOTO), elevar equipos, prohibir ingreso a zonas inundadas energizadas.", epp: "Casco dieléctrico, guantes aislantes, calzado eléctrico, protección facial y ropa contra arco según tensión.", retorno: "Instalaciones afectadas aisladas, inspeccionadas, probadas y autorizadas para energización por personal eléctrico competente." },
+    { num: "9.7", riesgo: "Ahogamiento y atrapamiento en agua", peligro: "Caídas a canales, quebradas, zonas bajas, socavaciones o corrientes en movimiento.", controles: "Mapeo de zonas inundables, barreras físicas, rutas alternativas, evacuación y rescate especializado (no cruzar corrientes).", epp: "Chaleco salvavidas adecuado, ropa de alta visibilidad, casco y botas antideslizantes.", retorno: "Zonas inundadas, corrientes, pozas y áreas socavadas delimitadas; rutas seguras verificadas." },
+    { num: "9.8", riesgo: "Estructuras inestables", peligro: "Colapso parcial o total de techos, muros, pisos, taludes o excavaciones por saturación.", controles: "Inspección preventiva, drenajes, restricción de cargas, zonas de exclusión, evaluación estructural y apuntalamiento.", epp: "Casco, botas con puntera y suela antideslizante, guantes, gafas, respirador contra polvo y arnés anticaídas si aplica.", retorno: "Estabilidad verificada por responsable técnico competente y áreas inseguras delimitadas antes del ingreso." },
+    { num: "9.9", riesgo: "Maquinaria y tránsito", peligro: "Atropello, vuelco, atrapamiento o falla por terreno saturado, barro y visibilidad reducida.", controles: "Inspección preuso y de rutas, segregación peatón-vehículo, señalero, control de velocidad y suspensión de tránsito no esencial.", epp: "Chaleco de alta visibilidad, casco, calzado de seguridad antideslizante y protección auditiva/ocular.", retorno: "Equipos inspeccionados (preuso) y vías aptas liberadas formalmente antes de reiniciar circulación." },
+    { num: "9.10", riesgo: "Residuos punzocortantes", peligro: "Objetos cortantes/punzantes ocultos bajo agua o lodo con riesgo de herida e infección.", controles: "No manipular con manos, usar herramientas de recolección, contenedores rígidos y disposición diferenciada.", epp: "Guantes resistentes a perforación, botas con plantilla antiperforación y suela antideslizante, gafas y ropa de protección.", retorno: "Residuos identificados y retirados con herramientas/contenedores apropiados; área inspeccionada antes de liberar." },
+    { num: "9.11", riesgo: "Fatiga física y mental", peligro: "Jornadas prolongadas, sobrecarga de emergencia, trabajo nocturno y alteración del descanso.", controles: "Planificar turnos y dotación, limitar jornadas, pausas programadas, rotación de tareas y vigilancia de signos de fatiga.", epp: "No aplica EPP específico (controles estrictamente organizacionales y de gestión de turnos).", retorno: "Personal con descanso y recuperación suficientes; turnos y carga revisados antes del reinicio." },
+    { num: "9.12", riesgo: "Factores de riesgo psicosociales", peligro: "Incertidumbre, presión temporal, estrés agudo, conflictos o exposición a eventos traumáticos.", controles: "Claridad de roles, comunicación continua, liderazgo participativo, primeros auxilios psicológicos y derivación confidencial.", epp: "No aplica EPP específico (controles organizacionales y de soporte emocional/salud mental).", retorno: "Roles y comunicación restablecidos; canales de apoyo y derivación disponibles respetando confidencialidad." },
+    { num: "9.13", riesgo: "Riesgos ergonómicos por carga física", peligro: "Sobreesfuerzo y trastornos musculoesqueléticos (TME) durante limpieza, remoción y recuperación.", controles: "Priorizar ayudas mecánicas, reducir pesos y distancias, evitar superficies inestables, alternar tareas y pausas.", epp: "Guantes de protección y calzado antideslizante con puntera reforzada (no sustituyen los controles ergonómicos).", retorno: "Tareas de limpieza/remoción reevaluadas en IPERC/ATS; ayudas mecánicas, herramientas y pausas adecuadas." }
+];
+
+window.abrirDashboardLineamientos = function() {
+    document.getElementById('lineamientosModal').style.display = 'flex';
+    renderizarDashboardLineamientos();
+};
+
+window.renderizarDashboardLineamientos = function() {
+    const q = normalizarTexto(document.getElementById('searchLineamientos')?.value || '');
+    const grid = document.getElementById('lineamientosGrid');
+    const counter = document.getElementById('countLineamientos');
+    if (!grid) return;
+
+    const filtrados = LINEAMIENTOS_NUMERAL9.filter(item =>
+        !q || normalizarTexto(`${item.num} ${item.riesgo} ${item.peligro} ${item.controles} ${item.epp} ${item.retorno}`).includes(q)
+    );
+
+    if (counter) counter.textContent = `${filtrados.length} de 13 riesgos`;
+    grid.innerHTML = filtrados.map(item => `
+        <div class="lin-card">
+            <div class="lin-card-head">
+                <h4>${item.riesgo}</h4>
+                <span class="lin-num">Num. ${item.num}</span>
+            </div>
+            <div class="lin-block"><strong>⚠️ Peligro / Exposición</strong>${item.peligro}</div>
+            <div class="lin-block"><strong>🛡️ Controles Críticos</strong>${item.controles}</div>
+            <div class="lin-block"><strong>🦺 EPP Requerido</strong>${item.epp}</div>
+            <div class="lin-retorno"><strong>✅ Retorno Seguro (Num. 11):</strong> ${item.retorno}</div>
+        </div>
+    `).join('');
+};
+
+// ============================================================================
+// 11. DASHBOARD ANEXO 1 — MATRIZ OPERATIVA MÍNIMA (39 REGISTROS OFICIALES)
+// ============================================================================
+const ANEXO1_DATA = [
+    ["Antes","Calor","Estrés térmico por calor (temperatura/humedad/carga metabólica/ropa-EPP).","Evaluación TGBH/WBGT e índice de calor; sombra; agua; plan de aclimatación; trabajo-descanso.","Servicio de SST / Responsable de la tarea-Operaciones","Alerta de calor o aumento de carga térmica.","Ropa ligera, transpirable y adecuada a la tarea; EPP compatible con el calor previsto.","Estrés térmico por calor, signos/síntomas y primeros auxilios.","Registro de evaluación térmica; IPERC actualizado; registro de entrega de equipos; capacitación."],
+    ["Durante","Calor","Golpe de calor, síncope, deshidratación.","Reducir exposición, pausas, hidratación, sombra, alerta entre compañeros y atención inmediata ante síntomas.","Responsable de la tarea-Operaciones / Servicio de SST","Síntomas, TGBH elevado o carga física alta.","Ropa transpirable y EPP que no incremente innecesariamente la carga térmica.","Primeros auxilios por calor.","Registro de pausas e hidratación; disponibilidad de sombra/agua; vigilancia de síntomas e incidentes."],
+    ["Después","Calor","Fatiga térmica acumulada al retornar.","Reevaluar condiciones y aclimatación; ajustar jornada y carga.","Servicio de SST / Responsable de la tarea-Operaciones","Reinicio tras suspensión o cambio en condiciones atmosféricas.","Mantener ropa y EPP adecuados a las condiciones térmicas y riesgos de la tarea.","Reaclimatación y autocuidado.","IPERC/ATS reevaluado antes del reinicio; registro de reprogramación y retorno progresivo."],
+    ["Antes","Radiación UV solar","Exposición solar ocupacional.","Programar tareas; sombra; ropa de trabajo; protección ocular y solar.","Servicio de SST / Responsable de la tarea-Operaciones","Trabajo exterior e Índice Ultravioleta (UVI) >= 3.","Ropa manga larga, sombrero ala ancha o casco con protección de nuca y lentes con filtro UV.","Riesgos de la radiación UV solar.","Lista de verificación de puestos exteriores; consulta Índice UV y programación; entrega EPP."],
+    ["Durante","Radiación UV solar","Quemadura, daño ocular y exposición acumulada.","Rotación/sombra; pausas; ropa de trabajo; protección ocular y solar; hidratación.","Responsable de la tarea-Operaciones / Servicio de SST","Trabajo exterior prolongado.","Ropa que cubra la piel, protección de nuca, lentes filtro UV y protector solar amplio espectro.","Riesgos de la radiación UV solar.","Registro de inspección en jornada sobre sombra/ropa/lentes; pausas y rotación."],
+    ["Después","Radiación UV solar","Reexposición durante recuperación exterior.","Reprogramar tareas y mantener controles solares.","Responsable de la tarea-Operaciones / Servicio de SST","Retorno de actividades exteriores.","Mantener ropa protectora, lentes filtro UV y protector solar mientras persista exposición.","Riesgos de la radiación UV solar.","Lista de verificación de control UV antes de reanudar labores exteriores; comunicación retorno seguro."],
+    ["Antes","Químicos","Derrame por desplazamiento de envases.","Almacenar sobre sistemas de contención; asegurar envases; inventario y FDS.","Responsable de almacén / Operaciones / Servicio de SST","Alerta de inundación/lluvia intensa.","Guantes y ropa resistentes a químicos, gafas de seguridad y calzado compatible.","Derrames y FDS.","Inventario y lista de verificación de contención secundaria; FDS accesibles; inspecciones."],
+    ["Durante","Químicos","Contacto, inhalación o incendio.","Aislar, ventilar, eliminar fuentes de ignición y activar respuesta especializada.","Personal entrenado en químicos / Servicio de SST","Derrame, olor, envase dañado o sustancia desconocida.","Guantes, ropa y botas resistentes a químicos; protección ocular/facial y respiratoria.","Derrames, sustancias peligrosas.","Reporte de derrame, aislamiento y control de acceso; autorización de personal interviniente."],
+    ["Después","Químicos","Exposición durante limpieza.","Identificar sustancia; usar FDS; recojo y segregación de residuos por personal entrenado.","Personal entrenado en químicos / Servicio de SST","Envases o residuos tras inundación.","EPP compatible con contaminantes presentes; protección respiratoria cuando corresponda.","Gestión de residuos químicos.","Registro de limpieza y segregación; constancia de disposición por operador autorizado; liberación."],
+    ["Antes","Biológico","Exposición a mohos, vectores y agua contaminada.","Plan de higiene; vacunación según evaluación sanitaria; control de plagas; kits de limpieza.","Servicio de SST","Temporada FEN / áreas húmedas.","Guantes, ropa de protección, calzado impermeable y protección ocular.","Higiene y agentes biológicos.","Plan de higiene y control de vectores; lista de verificación de kits; registro de vacunación."],
+    ["Durante","Biológico","Infección por contacto o inhalación.","Higiene de manos; cubrir heridas; minimizar aerosolización; control de vectores.","Responsable de la tarea-Operaciones / Servicio de SST","Agua, lodo, residuos orgánicos o moho.","Guantes, ropa de protección, botas impermeables, protección ocular/facial y respirador según agente.","Riesgos biológicos y primeros auxilios.","Registro de inspección, limpieza del área e incidentes/accidentes."],
+    ["Después","Biológico","Exposición a moho y residuos contaminados.","Secado, retiro de materiales no recuperables y limpieza segura; vigilancia de síntomas.","Servicio de SST","Humedad persistente o crecimiento de moho.","Guantes, ropa de protección, botas impermeables, protección ocular/facial y respiratoria.","Limpieza de moho.","Lista de verificación de secado, retiro de materiales y control de moho; vigilancia médica."],
+    ["Antes","Aguas residuales","Contacto con aguas contaminadas.","Identificar puntos de ingreso; proteger saneamiento; preparar barreras y kits de respuesta.","Responsable de la tarea-Operaciones / Servicio de SST","Pronóstico de inundación o riesgo de rebose.","Guantes impermeables, botas impermeables antideslizantes, ropa de protección y gafas.","Higiene, contaminación y uso de EPP.","Lista de verificación de puntos de ingreso, barreras y kits; mantenimiento preventivo."],
+    ["Durante","Aguas residuales","Exposición dérmica, ocular o respiratoria.","Evitar contacto; aislar; extracción mecánica; higiene; separar áreas limpias/sucias.","Responsable de la tarea-Operaciones / Servicio de SST","Agua servida, lodo contaminado o rebose.","Guantes impermeables, botas caña alta antideslizantes, ropa impermeable, protección ocular/facial y respiratoria.","Manejo de aguas residuales y descontaminación.","Registro de activación del procedimiento, aislamiento, extracción y disposición de residuos."],
+    ["Después","Aguas residuales","Exposición durante remoción y desinfección.","Ventilar, limpiar, secar y desinfectar; gestionar residuos; controlar reingreso.","Servicio de SST / Responsable de la tarea-Operaciones","Área aparentemente seca pero contaminada.","Guantes impermeables, botas antideslizantes, ropa de protección, ocular/facial y respiratoria.","Procedimiento de limpieza y desinfección.","Lista de verificación de limpieza, secado, desinfección y gestión de residuos."],
+    ["Antes","Eléctrico","Contacto con instalaciones eléctricas afectadas por agua.","Aislar circuitos críticos; inspeccionar tableros; elevar equipos; señalizar zonas de inundación.","Mantenimiento / Personal eléctrico competente / Servicio de SST","Aviso FEN o riesgo de inundación en instalaciones.","Casco dieléctrico, guantes aislantes y calzado de protección eléctrica.","Aislamiento eléctrico; LOTO; emergencias.","Lista de verificación de instalaciones eléctricas; registro de inspección y aislamiento de circuitos."],
+    ["Durante","Eléctrico","Electrocución, arco eléctrico o incendio por instalaciones energizadas en agua.","Evacuar/aislar; prohibir ingreso; desconexión por personal competente; no intervenir instalaciones inundadas.","Mantenimiento / Personal eléctrico competente / Servicio de SST","Agua en contacto con instalación eléctrica o cable caído.","EPP dieléctrico específico para tensión/tarea, protección facial y ropa contra arco.","Riesgo eléctrico y respuesta a emergencias.","Registro de aislamiento, señalización de perímetro, coordinación con empresa eléctrica y control de acceso."],
+    ["Después","Eléctrico","Reenergización insegura de equipos mojados.","Inspección, pruebas y autorización antes de energizar; reemplazo de componentes dañados.","Mantenimiento / Personal eléctrico competente + Servicio de SST","Final de inundación y antes de energización.","EPP eléctrico adecuado previa desenergización y verificación de ausencia de tensión.","Inspección y pruebas eléctricas.","Informe de inspección y pruebas eléctricas; constancia de liberación y autorización de reenergización."],
+    ["Antes","Ahogamiento","Caídas a canales, quebradas, zonas bajas o corrientes.","Mapear zonas peligrosas; barreras; rutas alternativas; señalización; plan de evacuación.","Responsable de la tarea-Operaciones / Servicio de SST","Alerta meteorológica o zona inundable.","Chaleco salvavidas, ropa alta visibilidad, casco y botas antideslizantes.","Evacuación y rescate.","Mapa de zonas inundables y rutas seguras; lista de verificación de barreras; simulacros."],
+    ["Durante","Ahogamiento","Arrastre, atrapamiento o inmersión.","Evacuación; no ingreso a corriente; rescate especializado; observador y comunicación.","Brigadas de emergencias","Agua en movimiento, corriente, socavación o baja visibilidad.","Chaleco salvavidas, alta visibilidad, casco y calzado antideslizante (rescate acuático especializado).","Rescate acuático y primeros auxilios.","Registro de evacuación, recuento de trabajadores, control de acceso y coordinación emergencias."],
+    ["Después","Ahogamiento","Caídas durante limpieza y remoción.","Drenar de forma segura; retirar obstáculos; señalizar pozas; inspección del terreno.","Responsable de la tarea-Operaciones / Servicio de SST","Ingreso posterior al evento.","Chaleco salvavidas si persiste riesgo, casco y botas impermeables antideslizantes.","Limpieza segura y prevención de caídas.","Lista de verificación del terreno, drenaje, obstáculos, pozas y liberación del área."],
+    ["Antes","Estructuras inestables","Colapso parcial de techos, muros, pisos o taludes.","Inspección preventiva; mantenimiento; drenaje; restricción de cargas; rutas alternativas.","Responsable técnico competente / Servicio de SST","Daño previo, alerta de lluvias o saturación.","Casco de seguridad, botas con puntera/antideslizante y chaleco alta visibilidad.","Reconocimiento de daños y evacuación.","Informe de inspección preventiva de techos, muros, taludes y drenajes; registro de mantenimiento."],
+    ["Durante","Estructuras inestables","Atrapamiento o golpes por colapso.","Evacuar y establecer zona de exclusión; no ingresar sin evaluación competente.","Brigadas de emergencias / Responsable técnico competente","Fisuras, deformaciones, desplazamientos, ruidos o colapso.","Casco, calzado seguridad, guantes, gafas, respirador polvo y protección anticaídas.","Rescate estructural y comunicación.","Registro de evacuación, zona de exclusión, control de acceso y evaluación competente."],
+    ["Después","Estructuras inestables","Colapso durante limpieza o remoción.","Evaluación estructural; apuntalamiento; secuencia segura de remoción.","Responsable técnico competente / Servicio de SST","Antes de reiniciar limpieza o desmontaje.","Casco, botas de seguridad, guantes, gafas y protección respiratoria.","Trabajo seguro en estructuras dañadas.","Informe de estabilidad estructural, apuntalamiento, ATS de remoción y acta de liberación."],
+    ["Antes","Maquinaria/tránsito","Atropello, vuelco, atrapamiento.","Inspección de rutas; segregación; mantenimiento; señalero; control de velocidad.","Mantenimiento / Operaciones / Servicio de SST","Lluvias, barro, visibilidad reducida.","Chaleco alta visibilidad, casco y calzado de seguridad antideslizante.","Conducción segura en condiciones adversas.","Check-list preuso de vehículos/equipos, inspección de rutas, segregación y mantenimiento."],
+    ["Durante","Maquinaria/tránsito","Accidente por terreno saturado.","Suspender circulación no esencial; delimitar; utilizar equipos adecuados; señalización.","Mantenimiento / Operaciones / Servicio de SST","Inundación, barro o pérdida de estabilidad.","Chaleco alta visibilidad, casco, calzado de seguridad y protección auditiva/ocular.","Tránsito interno y respuesta.","Registro de cierre de ruta, señalización y verificación del terreno antes de permitir tránsito."],
+    ["Después","Maquinaria/tránsito","Falla de equipo o vía dañada.","Inspección preuso; reparación; liberación de vías.","Mantenimiento / Operaciones / Servicio de SST","Antes de reiniciar circulación.","Chaleco alta visibilidad, casco, calzado de seguridad y guantes.","Inspección preuso.","Check-list preuso, registro de reparación y liberación formal de rutas/equipos."],
+    ["Antes","Residuos Punzocortantes","Objetos ocultos por agua o lodo.","Asegurar contenedores; plan de limpieza; herramientas de recolección.","Responsable de la tarea-Operaciones / Servicio de SST","Riesgo de residuos desplazados.","Guantes resistentes a perforación, botas con plantilla antiperforación y gafas.","Manejo seguro de residuos.","Lista de verificación de contenedores, herramientas de recolección y planificación de retiro."],
+    ["Durante","Residuos Punzocortantes","Punción, corte e infección.","No manipular con manos; herramientas y contenedores rígidos; atención inmediata a exposición.","Responsable de la tarea-Operaciones / Servicio de SST","Hallazgo de residuos punzocortantes.","Guantes antiperforación, botas impermeables antiperforación, gafas, ropa protección y facial si salpicaduras.","Bioseguridad y primeros auxilios.","Registro de hallazgo y retiro seguro con contenedor rígido; registro de incidentes."],
+    ["Después","Residuos Punzocortantes","Lesiones durante remoción final.","Inspección visual y remoción mecánica; disposición diferenciada.","Responsable de la tarea-Operaciones / Servicio de SST","Antes de liberar el área.","Guantes antiperforación, botas impermeables antideslizantes, gafas y protección facial.","Manejo de residuos punzocortantes.","Acta de limpieza final, inspección visual, liberación y segregación diferenciada."],
+    ["Antes","Fatiga física y mental","Fatiga por jornadas, esfuerzo, pausas insuficientes y alteración del descanso.","Planificar turnos, dotación, pausas y recuperación; limitar jornadas prolongadas; vigilar signos.","Operaciones / Recursos Humanos / Servicio de SST","Activación FEN y aumento de carga.","No aplica EPP específico.","Gestión de fatiga, descanso y recuperación.","Programación de turnos, dotación y pausas; registro de control de jornadas prolongadas."],
+    ["Durante","Fatiga física y mental","Errores, agotamiento y disminución de atención por sobrecarga.","Limitar jornadas; establecer pausas; rotar tareas; supervisar; priorizar tareas críticas.","Operaciones / Recursos Humanos / Servicio de SST","Turnos prolongados, sobrecarga o trabajo nocturno.","No aplica EPP específico.","Gestión de fatiga y respuesta a emergencias.","Registro de turnos, pausas, rotación de tareas e incidentes/accidentes."],
+    ["Después","Fatiga física y mental","Fatiga acumulada durante recuperación.","Descanso; retorno progresivo; reevaluación de carga y seguimiento.","Operaciones / Recursos Humanos / Servicio de SST","Reinicio tras emergencia significativa.","No aplica EPP específico.","Autocuidado, descanso y retorno seguro.","Programación de retorno progresivo, descansos, vigilancia médica y comunicación."],
+    ["Antes","Factores de riesgo psicosocial","Incertidumbre, presión temporal y falta de claridad de roles.","Definir roles; comunicación clara; liderazgo; dotación y canales de reporte; apoyo.","Operaciones / Recursos Humanos / Servicio de SST","Activación FEN y cambio organizacional.","No aplica EPP específico.","Comunicación y gestión de riesgos psicosociales.","Comunicación de funciones, canales de reporte y criterios de priorización."],
+    ["Durante","Factores de riesgo psicosocial","Estrés, conflictos o afectación emocional durante respuesta.","Comunicación continua; apoyo del liderazgo; participación; primeros auxilios psicológicos y derivación.","Operaciones / Recursos Humanos / Servicio de SST","Exposición a evento traumático, presión o sobrecarga.","No aplica EPP específico.","Riesgos psicosociales y primeros auxilios psicológicos.","Registro de activación de canales de apoyo, incidencias y vigilancia médica."],
+    ["Después","Factores de riesgo psicosocial","Estrés post evento y afectación emocional.","Seguimiento; retorno progresivo; apoyo y derivación según necesidad; lecciones aprendidas.","Operaciones / Recursos Humanos / Servicio de SST","Reinicio tras emergencia significativa.","No aplica EPP específico.","Salud mental y retorno seguro.","Registro de seguimiento, apoyo/derivación confidencial y comunicación retorno seguro."],
+    ["Antes","Riesgos ergonómicos por carga física","Sobreesfuerzo y TME durante preparación/remoción.","Planificar ayudas mecánicas; organizar cargas; seleccionar herramientas; prever pausas y alternancia.","Servicio de SST / Responsable de la tarea-Operaciones","Preparación de tareas de limpieza/recuperación.","Guantes de protección y calzado antideslizante con puntera (no sustituye controles ergonómicos).","Manipulación de cargas y organización del trabajo.","IPERC/ATS con cargas, herramientas y ayudas mecánicas; lista de verificación."],
+    ["Durante","Riesgos ergonómicos por carga física","Lesiones por levantamiento, empuje/tracción, posturas forzadas y repetición.","Usar ayudas mecánicas; reducir pesos y distancias; evitar superficies inestables; alternar tareas; pausas.","Servicio de SST / Responsable de la tarea-Operaciones","Carga física elevada o tarea prolongada.","Guantes de protección y calzado antideslizante con puntera (priorizar ayudas mecánicas).","Técnicas de trabajo y uso de ayudas mecánicas.","ATS/lista de verificación en tarea sobre ayudas mecánicas, pesos, superficies y pausas."],
+    ["Después","Riesgos ergonómicos por carga física","TME o sobreesfuerzo durante remoción y reorganización.","Reevaluar carga; ajustar herramientas, secuencia y dotación; priorizar ayudas mecánicas; retorno progresivo.","Servicio de SST / Responsable de la tarea-Operaciones","Inicio/reinicio de limpieza y recuperación.","Guantes de protección y calzado antideslizante con puntera reforzada.","Ergonomía de recuperación y reevaluación.","IPERC/ATS actualizado para remoción/reorganización; acta de liberación y reinicio progresivo."]
+];
+
+function poblarFiltroPeligrosAnexo1() {
+    const sel = document.getElementById('filterAnexoPeligro');
+    if (!sel || sel.options.length > 1) return;
+    const unicos = [...new Set(ANEXO1_DATA.map(r => r[1]))];
+    unicos.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        sel.appendChild(opt);
+    });
+}
+
+window.abrirDashboardAnexo1 = function() {
+    poblarFiltroPeligrosAnexo1();
+    document.getElementById('anexo1Modal').style.display = 'flex';
+    renderizarAnexo1();
+};
+
+window.renderizarAnexo1 = function() {
+    const pel = document.getElementById('filterAnexoPeligro')?.value || '';
+    const fase = document.getElementById('filterAnexoFase')?.value || '';
+    const q = normalizarTexto(document.getElementById('searchAnexo1')?.value || '');
+    const tbody = document.getElementById('anexo1TableBody');
+    const counter = document.getElementById('countAnexo1');
+    if (!tbody) return;
+
+    const filtrados = ANEXO1_DATA.filter(r => {
+        const matchPel = !pel || r[1] === pel;
+        const matchFase = !fase || r[0] === fase;
+        const matchQ = !q || normalizarTexto(r.join(' ')).includes(q);
+        return matchPel && matchFase && matchQ;
+    });
+
+    if (counter) counter.textContent = `${filtrados.length} registros`;
+
+    tbody.innerHTML = filtrados.map(r => {
+        const faseClass = r[0] === 'Antes' ? 'fase-antes' : (r[0] === 'Durante' ? 'fase-durante' : 'fase-despues');
+        return `
+            <tr>
+                <td><span class="fase-badge ${faseClass}">${r[0]}</span></td>
+                <td><strong>${r[1]}</strong></td>
+                <td>${r[2]}</td>
+                <td>${r[3]}</td>
+                <td>${r[4]}</td>
+                <td>${r[5]}</td>
+                <td>${r[6]}</td>
+                <td>${r[7]}</td>
+                <td>${r[8]}</td>
+            </tr>
+        `;
+    }).join('');
+};
+
+window.exportarAnexo1Excel = function() {
+    let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr><th>Fase</th><th>Peligro</th><th>Riesgo</th><th>Controles</th><th>Responsable</th><th>Criterio de Activación</th><th>EPP</th><th>Capacitación</th><th>Evidencia de Verificación</th></tr></thead><tbody>`;
+    ANEXO1_DATA.forEach(r => {
+        html += `<tr>${r.map(col => `<td>${col}</td>`).join('')}</tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Anexo1_Matriz_Operativa_SST_FEN_RM341_2026_TR.xls';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+// ============================================================================
+// 12. COMENTARIOS DIRECTOS AL ADMINISTRADOR Y BUZÓN PRIVADO (FIRESTORE)
+// ============================================================================
+window.abrirModalComentario = function() {
+    document.getElementById('commentText').value = '';
+    document.getElementById('commentStatusMsg').textContent = '';
+    document.getElementById('comentarioModal').style.display = 'flex';
+};
+
+window.enviarComentarioAdmin = async function() {
+    const cat = document.getElementById('commentCategory').value;
+    const msg = document.getElementById('commentText').value.trim();
+    const status = document.getElementById('commentStatusMsg');
+    const btn = document.getElementById('btnEnviarComentario');
+
+    if (!msg) {
+        status.style.color = '#b91c1c';
+        status.textContent = 'Por favor escribe tu comentario antes de enviar.';
+        return;
+    }
+
+    btn.disabled = true;
+    status.style.color = '#0f172a';
+    status.textContent = 'Enviando mensaje privado...';
+
+    try {
+        await addDoc(collection(db, "comentarios_admin"), {
+            categoria: cat,
+            mensaje: msg,
+            usuarioEmail: currentUser ? currentUser.email : 'Anónimo',
+            usuarioNombre: currentUser ? (currentUser.displayName || 'Usuario') : 'Anónimo',
+            distritoConsultado: puntoSeleccionadoActual.distrito,
+            fecha: serverTimestamp()
+        });
+        status.style.color = '#15803d';
+        status.textContent = '✅ Comentario enviado correctamente al administrador.';
+        setTimeout(() => {
+            cerrarModal('comentarioModal');
+            btn.disabled = false;
+        }, 1400);
+    } catch (e) {
+        console.error("Error al guardar comentario:", e);
+        status.style.color = '#b91c1c';
+        status.textContent = '⚠️ No se pudo enviar. Verifica las reglas de Firestore para comentarios_admin.';
+        btn.disabled = false;
+    }
+};
+
+window.abrirBuzonAdmin = async function() {
+    if (!esAdministrador(currentUser)) {
+        alert("Acceso restringido únicamente al administrador.");
+        return;
+    }
+    const modal = document.getElementById('adminInboxModal');
+    const list = document.getElementById('adminInboxList');
+    modal.style.display = 'flex';
+    list.innerHTML = 'Cargando mensajes privados...';
+
+    try {
+        const q = query(collection(db, "comentarios_admin"), orderBy("fecha", "desc"));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+            list.innerHTML = '<p style="color:#64748b; text-align:center; padding:20px;">Aún no hay comentarios registrados.</p>';
+            return;
+        }
+        let html = '';
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            const fechaStr = d.fecha && d.fecha.toDate ? d.fecha.toDate().toLocaleString('es-PE') : 'Reciente';
+            html += `
+                <div class="inbox-item">
+                    <div class="inbox-meta">
+                        <span><strong>${d.usuarioNombre || 'Usuario'}</strong> (${d.usuarioEmail || 'N/D'})</span>
+                        <span class="inbox-cat">${d.categoria || 'General'}</span>
+                        <span>${fechaStr}</span>
+                    </div>
+                    <div class="inbox-msg">${d.mensaje || ''}</div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    } catch (e) {
+        console.error("Error leyendo buzón admin:", e);
+        list.innerHTML = '<p style="color:#b91c1c;">Error al leer los comentarios. Asegúrate de haber publicado la regla de Firestore para tu correo de administrador.</p>';
+    }
+};
+
+// ============================================================================
+// 13. UTILIDADES DE MODALES, MAPA, CAPAS Y MÓVIL
+// ============================================================================
 window.abrirModalTablasTermicas = function() {
     document.getElementById('tablasTermicasModal').style.display = 'flex';
 };
 
-// Ejecutar cálculo inicial con el ejemplo oficial del Protocolo (30.3 °C, 58% HR, +8.3 °C = 41.3 °C)
-calcularIndiceCalor();
+window.cerrarModal = function(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+};
 
-// --- 10. EVENTOS DEL MAPA, BUSCADOR Y CONTROLES RESPONSIVE ---
 map.on('click', (e) => evaluarPuntoEnMapa(e.latlng.lat, e.latlng.lng));
 
 document.getElementById('btnDropPin')?.addEventListener('click', () => {
@@ -821,10 +1093,10 @@ document.getElementById('btnMyLocation')?.addEventListener('click', () => {
 });
 
 async function buscarDireccion() {
-    const query = document.getElementById('addressInput')?.value.trim();
-    if (!query) return;
+    const queryTxt = document.getElementById('addressInput')?.value.trim();
+    if (!queryTxt) return;
     try {
-        const url = `[https://nominatim.openstreetmap.org/search?format=json&q=$](https://nominatim.openstreetmap.org/search?format=json&q=$){encodeURIComponent(query + ', Lima, Peru')}&limit=1`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryTxt + ', Lima, Peru')}&limit=1`;
         const res = await fetch(url);
         const results = await res.json();
         if (results && results.length > 0) {
@@ -869,7 +1141,6 @@ document.getElementById('btnOpenNormativa')?.addEventListener('click', () => {
     document.getElementById('normativaModal').style.display = 'flex';
 });
 
-// Navegación por pestañas en dispositivos móviles (<= 1024px)
 window.cambiarVistaMovil = function(vista, btnEl) {
     document.querySelectorAll('.mob-tab-btn').forEach(b => b.classList.remove('active'));
     if (btnEl) {
@@ -894,6 +1165,6 @@ window.cambiarVistaMovil = function(vista, btnEl) {
         colRight.classList.add('mob-visible');
         colCenter.classList.add('mob-hidden');
     } else {
-        setTimeout(() => map.invalidateSize(), 120);
+        setTimeout(() => map.invalidateSize(), 150);
     }
 };
