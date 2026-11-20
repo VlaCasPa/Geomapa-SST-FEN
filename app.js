@@ -91,20 +91,19 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- 3. INICIALIZACIÓN DEL MAPA EN ESCALA DE GRISES (ESTABLE Y SIN BLOQUEOS) ---
+// --- 3. INICIALIZACIÓN DEL MAPA DE GOOGLE MAPS EN ESCALA DE GRISES ---
 const map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 11);
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
-// Capa base en escala de grises limpia y de alta disponibilidad
-const mapaBaseGris = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO | CENEPRED | MTPE R.M. N.° 341-2026-TR',
-    subdomains: 'abcd',
-    maxZoom: 20
+const googleGrisLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    attribution: '&copy; Google Maps | Cartografía: CENEPRED | Protocolo: MTPE R.M. N.° 341-2026-TR',
+    maxZoom: 20,
+    className: 'mapa-google-gris'
 }).addTo(map);
 
-// Recalcular dimensiones del mapa al terminar de renderizar el layout de 3 columnas
+// Forzar recalculo de tamaño del contenedor de 3 columnas para evitar pantalla gris
 window.addEventListener('load', () => {
-    setTimeout(() => map.invalidateSize(), 200);
+    setTimeout(() => map.invalidateSize(), 250);
 });
 window.addEventListener('resize', () => map.invalidateSize());
 
