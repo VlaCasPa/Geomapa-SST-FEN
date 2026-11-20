@@ -1,11 +1,11 @@
 // ============================================================================
-// GEOMAPA SST FEN PERÚ — LÓGICA PRINCIPAL (FASE 1: LIMA Y CALLAO)
+// GEOMAPA SST FEN PERÚ — VISOR GEOESPACIAL Y CALCULADORA DE ESTRÉS TÉRMICO (9.1)
 // Base Normativa: Protocolo SST ante el Fenómeno El Niño (R.M. N.° 341-2026-TR)
 // ============================================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { initializeApp } from "[https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js)";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "[https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js)";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "[https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js)";
 
 // --- 1. CONFIGURACIÓN FIREBASE (PROYECTO: geomapa-sst-fen-peru) ---
 const firebaseConfig = {
@@ -25,13 +25,13 @@ const googleProvider = new GoogleAuthProvider();
 
 let currentUser = null;
 
-// --- 2. AUTENTICACIÓN Y GOBERNANZA (GOOGLE SIGN-IN + DISCLAIMER) ---
+// --- 2. AUTENTICACIÓN Y GOBERNANZA ---
 window.loginConGoogle = async function() {
     try {
         await signInWithPopup(auth, googleProvider);
     } catch (error) {
         console.error("Error de inicio de sesión con Google:", error);
-        alert("No se pudo completar el inicio de sesión con Google. Verifique que las ventanas emergentes estén habilitadas.");
+        alert("No se pudo completar el inicio de sesión con Google. Verifique las ventanas emergentes.");
     }
 };
 
@@ -58,9 +58,7 @@ window.aceptarDisclaimer = async function() {
                 disclaimerAceptado: true,
                 fechaAceptacion: serverTimestamp()
             }, { merge: true });
-        } catch (e) {
-            console.warn("No se pudo registrar consentimiento en Firestore:", e);
-        }
+        } catch (e) {}
     }
 };
 
@@ -84,12 +82,8 @@ onAuthStateChanged(auth, async (user) => {
                 }
             } catch (e) {}
         }
-
-        if (!aceptado && disclaimerModal) {
-            disclaimerModal.style.display = 'flex';
-        } else if (disclaimerModal) {
-            disclaimerModal.style.display = 'none';
-        }
+        if (!aceptado && disclaimerModal) disclaimerModal.style.display = 'flex';
+        else if (disclaimerModal) disclaimerModal.style.display = 'none';
     } else {
         currentUser = null;
         if (loginModal) loginModal.style.display = 'flex';
@@ -97,17 +91,17 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- 3. INICIALIZACIÓN DEL MAPA EN ESCALA DE GRISES (LIMPIO AL INICIO) ---
+// --- 3. INICIALIZACIÓN DEL MAPA (DESPEJADO AL INICIO) ---
 const map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 11);
-L.control.zoom({ position: 'bottomleft' }).addTo(map);
+L.control.zoom({ position: 'topleft' }).addTo(map);
 
-const googleGrisLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m@129&x={x}&y={y}&z={z}', {
-    attribution: '&copy; Google Maps | Cartografía: CENEPRED | Protocolo: MTPE R.M. N.° 341-2026-TR',
+L.tileLayer('[https://mt1.google.com/vt/lyrs=m@129&x=](https://mt1.google.com/vt/lyrs=m@129&x=){x}&y={y}&z={z}', {
+    attribution: '&copy; Google Maps | CENEPRED | MTPE R.M. N.° 341-2026-TR',
     maxZoom: 20,
     className: 'mapa-google-gris'
 }).addTo(map);
 
-// --- 4. NORMALIZACIÓN DE NIVELES CENEPRED / SST ---
+// --- 4. NORMALIZACIÓN DE COLORES SST ---
 function normalizarTexto(str) {
     if (!str) return '';
     return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, ' ').trim().toUpperCase();
@@ -132,20 +126,16 @@ function getColorPeligro(nivel) {
 }
 
 function getTextColor(nivel) {
-    const est = obtenerNivelEstandar(nivel);
-    if (est === 'MEDIO') return '#0f172a';
-    return '#ffffff';
+    return obtenerNivelEstandar(nivel) === 'MEDIO' ? '#0f172a' : '#ffffff';
 }
 
-// --- 5. DATOS VECTORIALES Y RÁSTER DE LIMA Y CALLAO (CARGA EN MEMORIA, APAGADOS AL INICIO) ---
+// --- 5. CAPAS VECTORIALES Y RÁSTER (APAGADAS AL INICIO) ---
 const baseUrl = 'datos_vectoriales/';
 let geoDistritos = null, geoInundacion = null, geoHuaycos = null;
 let layerDistritos = null, layerInundacion = null, layerHuaycos = null, layerRios = null;
-let layerPuntosCriticos = L.layerGroup(); // Sin .addTo(map) inicial
+let layerPuntosCriticos = L.layerGroup();
 let rasterElevationLayer = null;
-let rawOriginBounds = null;
 
-// Ajuste fino heredado para el Modelo Digital de Elevación (MDE)
 const SHIFT_LAT = 0.0020;
 const SHIFT_LNG = 0.0032;
 
@@ -169,7 +159,6 @@ function utm18SToLatLng(easting, northing) {
     return [lat, lng];
 }
 
-// Carga Ráster MDE (elevacion.png + elevacion.pgw)
 fetch('datos_raster/elevacion.pgw')
     .then(res => res.ok ? res.text() : Promise.reject())
     .then(text => {
@@ -181,15 +170,13 @@ fetch('datos_raster/elevacion.pgw')
             const minY = maxY + (1160 * lines[3]);
             const sw = utm18SToLatLng(minX, minY);
             const ne = utm18SToLatLng(maxX, maxY);
-            rawOriginBounds = [
+            rasterElevationLayer = L.imageOverlay('datos_raster/elevacion.png', [
                 [sw[0] + SHIFT_LAT, sw[1] + SHIFT_LNG],
                 [ne[0] + SHIFT_LAT, ne[1] + SHIFT_LNG]
-            ];
-            rasterElevationLayer = L.imageOverlay('datos_raster/elevacion.png', rawOriginBounds, { opacity: 0.72, interactive: false });
+            ], { opacity: 0.72, interactive: false });
         }
     }).catch(() => {});
 
-// Carga de Polígonos Distritales (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'DISTRITOS%20DE%20LIMA%20Y%20CALLAO.geojson')
     .then(res => res.json())
     .then(data => {
@@ -204,7 +191,6 @@ fetch(baseUrl + 'DISTRITOS%20DE%20LIMA%20Y%20CALLAO.geojson')
         });
     });
 
-// Carga de Escenario Inundación CENEPRED (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'PELIGRO%20INUNDACION%20LIMA%20Y%20CALLAO.geojson')
     .then(res => res.json())
     .then(data => {
@@ -222,7 +208,6 @@ fetch(baseUrl + 'PELIGRO%20INUNDACION%20LIMA%20Y%20CALLAO.geojson')
         });
     });
 
-// Carga de Escenario Movimientos en Masa CENEPRED (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'PELIGRO%20MOVIMIENTOS%20EN%20MASAS%20LIMA%20Y%20CALLAO.geojson')
     .then(res => res.json())
     .then(data => {
@@ -240,16 +225,13 @@ fetch(baseUrl + 'PELIGRO%20MOVIMIENTOS%20EN%20MASAS%20LIMA%20Y%20CALLAO.geojson'
         });
     });
 
-// Carga de Ríos Rímac y Chillón (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'RIOS%20RIMAC%20CHILLON.geojson')
     .then(res => res.json())
     .then(data => {
-        layerRios = L.geoJSON(data, {
-            style: { color: '#0284c7', weight: 3, opacity: 0.85 }
-        });
+        layerRios = L.geoJSON(data, { style: { color: '#0284c7', weight: 3, opacity: 0.85 } });
     });
 
-// --- 6. DATASET DE 23 PUNTOS CRÍTICOS VIALES (LIMA Y CALLAO) ---
+// --- 6. PUNTOS CRÍTICOS VIALES ---
 const puntosCriticosDataset = [
     { name: "Paso a Desnivel Javier Prado - Vía Expresa", dir: "Av. Javier Prado Este con Vía Expresa Paseo de la República", dist: "San Isidro / La Victoria", inun: "Muy Alto", huay: "Bajo", lat: -12.0883, lon: -77.0275 },
     { name: "Paso a Desnivel Javier Prado - Gálvez Barrenechea", dir: "Av. Javier Prado Este con Av. José Gálvez Barrenechea", dist: "San Borja / San Isidro", inun: "Muy Alto", huay: "Bajo", lat: -12.0903, lon: -77.0142 },
@@ -314,7 +296,6 @@ function renderizarPuntosCriticos(filtrados = puntosCriticosDataset) {
                 </div>
             `;
             card.addEventListener('click', () => {
-                // Activa automáticamente la capa de puntos críticos si estaba apagada
                 const chkPc = document.getElementById('chkPuntosCriticos');
                 if (chkPc && !chkPc.checked) {
                     chkPc.checked = true;
@@ -327,9 +308,7 @@ function renderizarPuntosCriticos(filtrados = puntosCriticosDataset) {
                     inundacionOverride: pt.inun,
                     huaycosOverride: pt.huay
                 });
-                if (window.innerWidth <= 860) {
-                    document.getElementById('sideDrawer').classList.remove('drawer-open');
-                }
+                if (window.innerWidth <= 1024) cambiarVistaMovil('mapa');
             });
             listContainer.appendChild(card);
         }
@@ -350,7 +329,7 @@ function filtrarPuntosCriticos() {
 document.getElementById('filterPcText')?.addEventListener('input', filtrarPuntosCriticos);
 document.getElementById('filterPcRisk')?.addEventListener('change', filtrarPuntosCriticos);
 
-// --- 7. MOTOR DE INTERSECCIÓN ESPACIAL (PUNTO EN POLÍGONO) ---
+// --- 7. INTERSECCIÓN ESPACIAL ---
 function puntoEnAnillo(pt, ring) {
     const x = pt[0], y = pt[1];
     let inside = false;
@@ -396,31 +375,32 @@ function buscarAtributoEnCapa(geojson, lng, lat, propNames) {
     return null;
 }
 
-// --- 8. INTERPRETACIÓN TÉCNICA SST (R.M. N.° 341-2026-TR) ---
+// --- 8. DIAGNÓSTICO TERRITORIAL CENEPRED ---
 let ultimoDiagnostico = null;
 let faseActual = 'antes';
+let puntoSeleccionadoActual = { lat: -12.0464, lng: -77.0428, distrito: "Lima Metropolitana" };
 
 function generarRecomendacionesProtocolo(nivelInun, nivelHuay) {
     const esCritico = (nivelInun === 'MUY ALTO' || nivelInun === 'ALTO' || nivelHuay === 'MUY ALTO' || nivelHuay === 'ALTO');
     return {
         antes: [
-            "Actualizar la matriz IPERC incorporando escenarios de lluvias intensas, aniegos y escorrentía en este sector (Ley N.° 29783, Art. 57).",
+            "Actualizar matriz IPERC incorporando escenarios de lluvias intensas y aniegos en este sector (Ley N.° 29783, Art. 57).",
             "Inspeccionar y limpiar canaletas, sumideros, techos y drenajes perimetrales antes de precipitaciones.",
             esCritico
-                ? "ALERTA SECTORIAL: Implementar barreras contra inundaciones, verificar motobombas operativas y señalizar rutas de evacuación hacia cotas altas."
-                : "Verificar disponibilidad de kit de emergencia, impermeables, calzado antideslizante y protección solar FPS 50+ (D.S. N.° 003-2026-SA)."
+                ? "ALERTA SECTORIAL: Implementar barreras contra inundaciones, verificar motobombas operativas y señalizar rutas de evacuación."
+                : "Verificar disponibilidad de kit de emergencia, impermeables, calzado antideslizante y bloqueador FPS 50+."
         ],
         durante: [
             esCritico
-                ? "EJERCER PARALIZACIÓN INMEDIATA si existe peligro inminente por aniego severo, tormenta eléctrica o flujo de detritos (Ley N.° 29783, Art. 63)."
-                : "Monitorear avisos meteorológicos de SENAMHI y restringir trabajos en excavaciones, taludes o redes eléctricas expuestas a humedad.",
-            "Cortar el suministro eléctrico en tableros o áreas vulnerables a filtración de agua.",
-            "Activar brigadas de emergencia y evacuar al personal hacia zonas seguras previamente definidas."
+                ? "EJERCER PARALIZACIÓN INMEDIATA ante peligro inminente por aniego severo, tormenta eléctrica o flujo de detritos (Ley N.° 29783, Art. 63)."
+                : "Monitorear avisos de SENAMHI y restringir trabajos en excavaciones, taludes o redes eléctricas expuestas.",
+            "Cortar suministro eléctrico en tableros o áreas vulnerables a filtración de agua.",
+            "Activar brigadas de emergencia y evacuar hacia zonas seguras previamente definidas."
         ],
         despues: [
-            "Ejecutar Inspección Técnica de Seguridad post-emergencia antes de autorizar el reingreso del personal (Numeral 11 - Retorno Seguro).",
-            "Desenergizar y verificar ausencia de cables expuestos, socavaciones o inestabilidad de taludes y estructuras.",
-            "Eliminar aguas estancadas para prevenir vectores (dengue/leptospirosis) y evaluar modalidad de teletrabajo si las vías de acceso están dañadas."
+            "Ejecutar Inspección Técnica de Seguridad post-emergencia antes del reingreso del personal (Numeral 11 - Retorno Seguro).",
+            "Desenergizar y verificar ausencia de cables expuestos, socavaciones o inestabilidad de estructuras.",
+            "Eliminar aguas estancadas para prevenir vectores y evaluar teletrabajo si las vías están afectadas."
         ]
     };
 }
@@ -429,17 +409,13 @@ window.cambiarFaseTab = function(fase, btnEl) {
     faseActual = fase;
     document.querySelectorAll('.phase-tab').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
-    renderizarContenidoFase();
+    const container = document.getElementById('protocolContent');
+    if (container && ultimoDiagnostico) {
+        const items = ultimoDiagnostico.recomendaciones[faseActual] || [];
+        container.innerHTML = `<ul>${items.map(txt => `<li>${txt}</li>`).join('')}</ul>`;
+    }
 };
 
-function renderizarContenidoFase() {
-    const container = document.getElementById('protocolContent');
-    if (!container || !ultimoDiagnostico) return;
-    const items = ultimoDiagnostico.recomendaciones[faseActual] || [];
-    container.innerHTML = `<ul>${items.map(txt => `<li>${txt}</li>`).join('')}</ul>`;
-}
-
-// --- 9. CONSULTA INTERACTIVA DE PUNTO (PIN ARRASTRABLE, GPS O CLIC EN MAPA) ---
 let activeQueryMarker = null;
 
 async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
@@ -459,6 +435,8 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
     });
 
     const distritoDetectado = buscarAtributoEnCapa(geoDistritos, lng, lat, ['NOMBDIST', 'distrito', 'DISTRITO']) || 'Lima Metropolitana / Callao';
+    puntoSeleccionadoActual = { lat, lng, distrito: distritoDetectado };
+
     const rawInun = opciones.inundacionOverride || buscarAtributoEnCapa(geoInundacion, lng, lat, ['niv_sinu', 'NIVEL']) || 'Bajo / Sin polígono crítico';
     const rawHuay = opciones.huaycosOverride || buscarAtributoEnCapa(geoHuaycos, lng, lat, ['npel_mm', 'NIVEL']) || 'Bajo / Sin polígono crítico';
 
@@ -469,7 +447,7 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
     if (panel) panel.style.display = 'flex';
 
     document.getElementById('diagDistritoTitle').textContent = opciones.titulo || `Distrito: ${distritoDetectado}`;
-    document.getElementById('diagCoordsText').textContent = `Coordenadas WGS84: ${lat.toFixed(5)}, ${lng.toFixed(5)} (Arrastra el pin para ajustar)`;
+    document.getElementById('diagCoordsText').textContent = `WGS84: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     document.getElementById('diagAddressText').textContent = opciones.direccion || 'Obteniendo dirección referencial...';
 
     const cardInun = document.getElementById('cardInundacion');
@@ -484,23 +462,23 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
     cardHuay.style.color = getTextColor(nivelHuay);
     valHuay.textContent = nivelHuay === 'NO DETERMINADO' ? rawHuay : nivelHuay;
 
-    const recomendaciones = generarRecomendacionesProtocolo(nivelInun, nivelHuay);
     ultimoDiagnostico = {
         fecha: new Date().toLocaleString('es-PE'),
         distrito: distritoDetectado,
-        lat,
-        lng,
+        lat, lng,
         direccion: opciones.direccion || '',
         nivelInun: valInun.textContent,
         nivelHuay: valHuay.textContent,
-        recomendaciones
+        recomendaciones: generarRecomendacionesProtocolo(nivelInun, nivelHuay)
     };
+    window.cambiarFaseTab(faseActual, document.querySelector('.phase-tab.active'));
 
-    renderizarContenidoFase();
+    // Sincronizar también clima en el panel derecho de Estrés Térmico
+    cargarClimaPuntoActual(true);
 
     if (!opciones.direccion) {
         try {
-            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+            const resp = await fetch(`[https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$](https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$){lat}&lon=${lng}`);
             const data = await resp.json();
             const dir = data.display_name || `Sector ${distritoDetectado}`;
             document.getElementById('diagAddressText').textContent = dir;
@@ -529,59 +507,318 @@ window.cerrarDiagnostico = function() {
 window.copiarDiagnosticoSST = function() {
     if (!ultimoDiagnostico) return;
     const texto = [
-        `DIAGNÓSTICO REFERENCIAL SST — FENÓMENO EL NIÑO (R.M. N.° 341-2026-TR)`,
+        `DIAGNÓSTICO TERRITORIAL SST — FENÓMENO EL NIÑO (R.M. N.° 341-2026-TR)`,
         `Fecha/Hora: ${ultimoDiagnostico.fecha}`,
         `Ubicación: ${ultimoDiagnostico.distrito} (${ultimoDiagnostico.lat.toFixed(5)}, ${ultimoDiagnostico.lng.toFixed(5)})`,
-        `Dirección Ref.: ${ultimoDiagnostico.direccion}`,
         `Susceptibilidad Inundación (CENEPRED): ${ultimoDiagnostico.nivelInun}`,
         `Susceptibilidad Mov. en Masa (CENEPRED): ${ultimoDiagnostico.nivelHuay}`,
-        `Controles Prioritarios (Antes): ${ultimoDiagnostico.recomendaciones.antes[0]}`,
-        `Nota: Fuente referencial Geomapa SST FEN Perú. Sujeto a validación IPERC del centro de trabajo.`
+        `Control Prioritario: ${ultimoDiagnostico.recomendaciones.antes[0]}`
     ].join('\n');
 
     navigator.clipboard.writeText(texto).then(() => {
         const btn = document.getElementById('btnCopyReport');
         const orig = btn.textContent;
-        btn.textContent = "✅ ¡Diagnóstico copiado al portapapeles!";
-        setTimeout(() => { btn.textContent = orig; }, 2500);
+        btn.textContent = "✅ ¡Copiado!";
+        setTimeout(() => { btn.textContent = orig; }, 2200);
     });
 };
 
-// Clic directo en el mapa
-map.on('click', (e) => {
-    evaluarPuntoEnMapa(e.latlng.lat, e.latlng.lng);
-});
+// ============================================================================
+// 9. CALCULADORA OFICIAL DE ESTRÉS TÉRMICO POR CALOR (NUMERAL 9.1 PROTOCOLO)
+// ============================================================================
+let modoTermicoActual = 'hi'; // 'hi' (Índice de Calor NWS) | 'tgbh' (TGBH Efectivo)
+let ultimoReporteTermico = '';
 
-// Botón "Picar Punto"
-document.getElementById('btnDropPin')?.addEventListener('click', () => {
-    const center = map.getCenter();
-    evaluarPuntoEnMapa(center.lat, center.lng);
-});
+window.cambiarModoTermico = function(modo, btnEl) {
+    modoTermicoActual = modo;
+    document.querySelectorAll('.t-mode-btn').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
 
-// Botón "Mi GPS"
-document.getElementById('btnMyLocation')?.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-        alert("Su navegador no soporta geolocalización GPS.");
-        return;
+    document.getElementById('formIndiceCalor').style.display = (modo === 'hi') ? 'block' : 'none';
+    document.getElementById('formTGBH').style.display = (modo === 'tgbh') ? 'block' : 'none';
+
+    if (modo === 'hi') calcularIndiceCalor();
+    else calcularTGBH();
+};
+
+// Obtención de temperatura y humedad actual del punto seleccionado (Open-Meteo API sin CORS)
+window.cargarClimaPuntoActual = async function(silencioso = false) {
+    const noteEl = document.getElementById('weatherSourceNote');
+    const { lat, lng, distrito } = puntoSeleccionadoActual;
+    if (noteEl) noteEl.textContent = `Consultando condiciones meteorológicas en ${distrito}...`;
+
+    try {
+        const url = `[https://api.open-meteo.com/v1/forecast?latitude=$](https://api.open-meteo.com/v1/forecast?latitude=$){lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=temperature_2m,relative_humidity_2m&timezone=America%2FLima`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.current) {
+            const tempC = data.current.temperature_2m;
+            const rh = data.current.relative_humidity_2m;
+            document.getElementById('hiTempC').value = tempC.toFixed(1);
+            document.getElementById('hiHumidity').value = Math.round(rh);
+            if (noteEl) {
+                noteEl.innerHTML = `✅ Clima ref. en <strong>${distrito}</strong>: <strong>${tempC.toFixed(1)} °C</strong> | <strong>${Math.round(rh)}% HR</strong> (Contrastable con SENAMHI).`;
+            }
+            if (modoTermicoActual === 'hi') calcularIndiceCalor();
+        }
+    } catch (e) {
+        if (!silencioso && noteEl) {
+            noteEl.textContent = "⚠️ No se pudo sincronizar automáticamente. Ingrese los valores de SENAMHI manualmente.";
+        }
     }
+};
+
+// Ecuación oficial de regresión de Rothfusz (NWS / NOAA) en °C
+function calcularRothfuszCelsius(tempC, rh) {
+    const T = (tempC * 9 / 5) + 32; // Convertir °C a °F
+    const R = rh;
+
+    // Fórmula simple de Steadman si T < 80°F
+    let HI = 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (R * 0.094));
+
+    if ((HI + T) / 2 >= 80.0) {
+        HI = -42.379 + 2.04901523 * T + 10.14333127 * R
+             - 0.22475541 * T * R - 0.00683783 * T * T
+             - 0.05481717 * R * R + 0.00122874 * T * T * R
+             + 0.00085282 * T * R * R - 0.00000199 * T * T * R * R;
+
+        // Ajuste por baja humedad (< 13% y 80°F <= T <= 112°F)
+        if (R < 13 && T >= 80 && T <= 112) {
+            HI -= ((13 - R) / 4) * Math.sqrt((17 - Math.abs(T - 95.0)) / 17);
+        }
+        // Ajuste por alta humedad (> 85% y 80°F <= T <= 87°F)
+        else if (R > 85 && T >= 80 && T <= 87) {
+            HI += ((R - 85) / 10) * ((87 - T) / 5);
+        }
+    }
+
+    return (HI - 32) * 5 / 9; // Regresar a °C
+}
+
+// Clasificación oficial según Tabla 4 del Protocolo MTPE (R.M. N.° 341-2026-TR)
+function interpretarTabla4IndiceCalor(hiEfectivo) {
+    if (hiEfectivo >= 51.7) {
+        return {
+            nivel: "RIESGO MUY ALTO",
+            color: "#dc2626",
+            textColor: "#ffffff",
+            salud: "Condiciones de calor extremo, con riesgo muy elevado de enfermedad grave por calor (golpe de calor fulminante).",
+            controles: [
+                "Evitar la exposición no controlada; suspender o reprogramar las tareas que no puedan ejecutarse con controles eficaces.",
+                "Aplicar paralización preventiva por peligro grave e inminente (Ley N.° 29783, Art. 63) si no hay climatización o sombra efectiva.",
+                "Considerar los límites correspondientes al tipo de trabajo y la aclimatación (Tabla 3)."
+            ]
+        };
+    } else if (hiEfectivo >= 39.4) {
+        return {
+            nivel: "RIESGO ALTO",
+            color: "#ea580c",
+            textColor: "#ffffff",
+            salud: "Aumenta considerablemente la posibilidad de calambres y agotamiento por calor; puede presentarse golpe de calor.",
+            controles: [
+                "Aplicar controles intensificados, reducir la duración de la exposición y disminuir la carga física.",
+                "Establecer ciclos obligatorios de trabajo/descanso en áreas frescas o sombreadas e hidratación permanente.",
+                "Considerar los límites correspondientes al tipo de trabajo y la aclimatación (Tabla 3)."
+            ]
+        };
+    } else if (hiEfectivo >= 32.2) {
+        return {
+            nivel: "RIESGO MEDIO",
+            color: "#eab308",
+            textColor: "#0f172a",
+            salud: "Posibles calambres, agotamiento por calor y golpe de calor, especialmente con esfuerzo físico o exposición prolongada.",
+            controles: [
+                "Incrementar las pausas en lugares frescos, reducir el esfuerzo físico y reforzar la supervisión en campo.",
+                "Garantizar puntos de hidratación con agua fresca a menos de 50 metros y uso de bloqueador solar FPS 50+.",
+                "Considerar los límites correspondientes al tipo de trabajo y la aclimatación (Tabla 3)."
+            ]
+        };
+    } else if (hiEfectivo >= 26.7) {
+        return {
+            nivel: "RIESGO BAJO",
+            color: "#16a34a",
+            textColor: "#ffffff",
+            salud: "Puede aparecer fatiga con exposición prolongada o esfuerzo físico.",
+            controles: [
+                "Mantener agua potable disponible, áreas de sombra, vigilancia de síntomas tempranos y pausas apropiadas.",
+                "Considerar la carga física de la tarea y el estado de aclimatación del trabajador.",
+                "Suministrar ropa transpirable y protección contra radiación UV (Ley N.° 30102)."
+            ]
+        };
+    } else {
+        return {
+            nivel: "CONFORT / SIN ALERTA",
+            color: "#0284c7",
+            textColor: "#ffffff",
+            salud: "Condición térmica por debajo del umbral de precaución (26,7 °C).",
+            controles: [
+                "Mantener hidratación regular y medidas estándar de protección solar si se labora a la intemperie.",
+                "Monitorear variaciones térmicas hacia el mediodía."
+            ]
+        };
+    }
+}
+
+window.calcularIndiceCalor = function() {
+    const tempC = parseFloat(document.getElementById('hiTempC').value);
+    const rh = parseFloat(document.getElementById('hiHumidity').value);
+    const solDirecto = document.getElementById('hiDirectSun').checked;
+
+    if (isNaN(tempC) || isNaN(rh)) return;
+
+    const hiSombra = calcularRothfuszCelsius(tempC, rh);
+    const ajusteSolar = solDirecto ? 8.3 : 0.0;
+    const hiEfectivo = hiSombra + ajusteSolar;
+
+    const evalT4 = interpretarTabla4IndiceCalor(hiEfectivo);
+
+    const banner = document.getElementById('thermalBanner');
+    banner.style.backgroundColor = evalT4.color;
+    banner.style.color = evalT4.textColor;
+
+    document.getElementById('thermalMethodLabel').textContent = "ÍNDICE DE CALOR EFECTIVO (TABLA 4)";
+    document.getElementById('thermalMainValue').textContent = `${hiEfectivo.toFixed(1)} °C`;
+    document.getElementById('thermalSubValue').textContent = solDirecto
+        ? `Sombra: ${hiSombra.toFixed(1)} °C + 8.3 °C (sol directo)`
+        : `Condición bajo sombra (sin ajuste solar)`;
+
+    document.getElementById('thermalRiskBadge').textContent = evalT4.nivel;
+    document.getElementById('tgbhActionBox').style.display = 'none';
+    document.getElementById('thermalHealthText').textContent = evalT4.salud;
+
+    const listEl = document.getElementById('thermalControlsList');
+    listEl.innerHTML = evalT4.controles.map(c => `<li>${c}</li>`).join('');
+
+    ultimoReporteTermico = [
+        `EVALUACIÓN DE ESTRÉS TÉRMICO — PROTOCOLO MTPE (R.M. N.° 341-2026-TR - NUMERAL 9.1)`,
+        `Fecha/Hora: ${new Date().toLocaleString('es-PE')}`,
+        `Sector: ${puntoSeleccionadoActual.distrito} (${puntoSeleccionadoActual.lat.toFixed(4)}, ${puntoSeleccionadoActual.lng.toFixed(4)})`,
+        `Método: Opción 2 - Índice de Calor (NWS/NOAA)`,
+        `Datos ingresados: Temp. Aire = ${tempC.toFixed(1)} °C | Humedad Relativa = ${rh}% | Sol directo = ${solDirecto ? 'Sí (+8.3 °C)' : 'No'}`,
+        `Resultado: Índice de Calor Efectivo = ${hiEfectivo.toFixed(1)} °C (${evalT4.nivel})`,
+        `Impacto en Salud: ${evalT4.salud}`,
+        `Medidas de Control: ${evalT4.controles.join(' | ')}`
+    ].join('\n');
+};
+
+// Cálculo Opción 1: TGBH y TGBH Efectivo (R.M. N.° 375-2008-TR + Tablas 2 y 3)
+const limitesTabla3 = {
+    ligero:    { no: 28, si: 30, nombre: "Ligero",     decision: "Al alcanzar el valor aplicable, evaluar y reforzar los controles; no asumir que la tarea es segura solo por ser ligera." },
+    moderado:  { no: 25, si: 28, nombre: "Moderado",   decision: "Reducir la exposición térmica, organizar pausas y reevaluar la tarea." },
+    pesado:    { no: 23, si: 26, nombre: "Pesado",     decision: "Priorizar reducción del esfuerzo, pausas más frecuentes y trabajo en horas menos calurosas; reevaluar antes de continuar." },
+    muypesado: { no: 21, si: 25, nombre: "Muy pesado", decision: "Aplicar controles reforzados desde valores relativamente bajos; considerar la suspensión o reprogramación si no se puede reducir suficientemente la exposición." }
+};
+
+window.calcularTGBH = function() {
+    const cond = document.getElementById('tgbhCondicion').value;
+    const tbh = parseFloat(document.getElementById('valTBH').value) || 0;
+    const tg = parseFloat(document.getElementById('valTG').value) || 0;
+    const tbs = parseFloat(document.getElementById('valTBS').value) || 0;
+    const cav = parseFloat(document.getElementById('tgbhRopa').value) || 0;
+    const cargaKey = document.getElementById('tgbhCarga').value;
+    const aclim = document.getElementById('tgbhAclimatacion').value;
+
+    document.getElementById('fieldTBS').style.opacity = (cond === 'sol') ? '1' : '0.45';
+
+    const tgbhBase = (cond === 'sol')
+        ? (0.7 * tbh + 0.2 * tg + 0.1 * tbs)
+        : (0.7 * tbh + 0.3 * tg);
+
+    const tgbhEfectivo = tgbhBase + cav;
+    const infoCarga = limitesTabla3[cargaKey];
+    const valorAccion = (aclim === 'si') ? infoCarga.si : infoCarga.no;
+    const superaLimite = tgbhEfectivo >= valorAccion;
+
+    // Clasificación visual comunicacional (Tabla 1 del Protocolo)
+    let nivelColor = "#16a34a", textColor = "#ffffff", nivelLabel = "RIESGO BAJO (< 21 °C)";
+    if (tgbhEfectivo > 28) {
+        nivelColor = "#dc2626"; nivelLabel = "RIESGO MUY ALTO (> 28 °C)";
+    } else if (tgbhEfectivo >= 25) {
+        nivelColor = "#ea580c"; nivelLabel = "RIESGO ALTO (25–28 °C)";
+    } else if (tgbhEfectivo >= 21) {
+        nivelColor = "#eab308"; textColor = "#0f172a"; nivelLabel = "RIESGO MEDIO (21–25 °C)";
+    }
+
+    const banner = document.getElementById('thermalBanner');
+    banner.style.backgroundColor = nivelColor;
+    banner.style.color = textColor;
+
+    document.getElementById('thermalMethodLabel').textContent = "TGBH EFECTIVO (R.M. N.° 375-2008-TR)";
+    document.getElementById('thermalMainValue').textContent = `${tgbhEfectivo.toFixed(1)} °C`;
+    document.getElementById('thermalSubValue').textContent = `TGBH medido: ${tgbhBase.toFixed(1)} °C + Ajuste ropa/EPP: +${cav} °C`;
+    document.getElementById('thermalRiskBadge').textContent = superaLimite ? "⚠️ SUPERA VALOR ACCIÓN" : "✅ DENTRO DE LÍMITE";
+
+    const actionBox = document.getElementById('tgbhActionBox');
+    actionBox.style.display = 'block';
+    actionBox.style.backgroundColor = superaLimite ? '#fef2f2' : '#f0fdf4';
+    actionBox.style.color = superaLimite ? '#991b1b' : '#166534';
+    actionBox.innerHTML = `<strong>Tabla 3 (${infoCarga.nombre} / ${aclim === 'si' ? 'Aclimatado' : 'No aclimatado'}):</strong> Valor de acción = <strong>${valorAccion} °C</strong>. ${superaLimite ? 'Se alcanzó o superó el límite de acción.' : 'Por debajo del valor de acción aplicable.'}`;
+
+    document.getElementById('thermalHealthText').textContent = superaLimite
+        ? "Sobrecarga térmica ocupacional detectada según carga metabólica y vestimenta. Riesgo de fatiga térmica, calambres, agotamiento o golpe de calor."
+        : "Carga térmica ambiental controlada para el nivel de esfuerzo y aclimatación seleccionados, sujeto a vigilancia preventiva.";
+
+    const controles = [
+        `Decisión Preventiva (Tabla 3): ${infoCarga.decision}`,
+        "Suministrar hidratación fresca permanente (electrolitos/agua potable) y habilitar estaciones de sombra ventiladas.",
+        "Implementar programa de aclimatación gradual (7 a 14 días) para personal nuevo o que retorna tras ausencia.",
+        "Vigilar síntomas de alerta temprana (mareos, sudoración excesiva o piel seca/caliente, cefalea, confusión)."
+    ];
+
+    document.getElementById('thermalControlsList').innerHTML = controles.map(c => `<li>${c}</li>`).join('');
+
+    ultimoReporteTermico = [
+        `EVALUACIÓN TGBH EFECTIVO — R.M. N.° 375-2008-TR / PROTOCOLO FEN (R.M. N.° 341-2026-TR)`,
+        `Fecha/Hora: ${new Date().toLocaleString('es-PE')}`,
+        `Sector: ${puntoSeleccionadoActual.distrito}`,
+        `Mediciones: TBH=${tbh}°C, TG=${tg}°C, TBS=${tbs}°C (${cond === 'sol' ? 'Con carga solar' : 'Sin carga solar'})`,
+        `TGBH Base = ${tgbhBase.toFixed(1)} °C | Ajuste Ropa/EPP = +${cav} °C | TGBH Efectivo = ${tgbhEfectivo.toFixed(1)} °C`,
+        `Criterio Tabla 3: Trabajo ${infoCarga.nombre} (${aclim === 'si' ? 'Aclimatado' : 'No aclimatado'}) -> Valor de acción: ${valorAccion} °C (${superaLimite ? 'SUPERA LÍMITE' : 'CUMPLE'})`,
+        `Decisión Preventiva: ${infoCarga.decision}`
+    ].join('\n');
+};
+
+window.copiarReporteTermico = function() {
+    if (!ultimoReporteTermico) return;
+    navigator.clipboard.writeText(ultimoReporteTermico).then(() => {
+        const btn = document.getElementById('btnCopyThermal');
+        const orig = btn.textContent;
+        btn.textContent = "✅ ¡Evaluación Térmica Copiada!";
+        setTimeout(() => { btn.textContent = orig; }, 2200);
+    });
+};
+
+window.abrirModalTablasTermicas = function() {
+    document.getElementById('tablasTermicasModal').style.display = 'flex';
+};
+
+// Ejecutar cálculo inicial con el ejemplo oficial del Protocolo (30.3 °C, 58% HR, +8.3 °C = 41.3 °C)
+calcularIndiceCalor();
+
+// --- 10. EVENTOS DEL MAPA, BUSCADOR Y CONTROLES RESPONSIVE ---
+map.on('click', (e) => evaluarPuntoEnMapa(e.latlng.lat, e.latlng.lng));
+
+document.getElementById('btnDropPin')?.addEventListener('click', () => {
+    const c = map.getCenter();
+    evaluarPuntoEnMapa(c.lat, c.lng);
+});
+
+document.getElementById('btnMyLocation')?.addEventListener('click', () => {
+    if (!navigator.geolocation) return alert("Su navegador no soporta geolocalización GPS.");
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            const { latitude, longitude } = pos.coords;
-            map.setView([latitude, longitude], 15);
-            evaluarPuntoEnMapa(latitude, longitude);
+            map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+            evaluarPuntoEnMapa(pos.coords.latitude, pos.coords.longitude);
         },
-        () => alert("No se pudo obtener su ubicación GPS. Verifique los permisos de ubicación en su dispositivo.")
+        () => alert("No se pudo obtener su ubicación GPS. Verifique los permisos.")
     );
 });
 
-// Buscador de direcciones (Nominatim acotado a Lima/Callao)
 async function buscarDireccion() {
-    const input = document.getElementById('addressInput');
-    const query = input?.value.trim();
+    const query = document.getElementById('addressInput')?.value.trim();
     if (!query) return;
-
     try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Lima, Peru')}&limit=1`;
+        const url = `[https://nominatim.openstreetmap.org/search?format=json&q=$](https://nominatim.openstreetmap.org/search?format=json&q=$){encodeURIComponent(query + ', Lima, Peru')}&limit=1`;
         const res = await fetch(url);
         const results = await res.json();
         if (results && results.length > 0) {
@@ -590,19 +827,15 @@ async function buscarDireccion() {
             map.setView([lat, lon], 15);
             evaluarPuntoEnMapa(lat, lon, { direccion: results[0].display_name });
         } else {
-            alert("No se encontró la dirección en Lima/Callao. Intente con el nombre de la avenida o distrito.");
+            alert("No se encontró la dirección en Lima/Callao.");
         }
     } catch (e) {
-        alert("Error al consultar el buscador de direcciones.");
+        alert("Error al consultar el buscador.");
     }
 }
-
 document.getElementById('btnSearchAddress')?.addEventListener('click', buscarDireccion);
-document.getElementById('addressInput')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') buscarDireccion();
-});
+document.getElementById('addressInput')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') buscarDireccion(); });
 
-// --- 10. CONTROL DE CAPAS Y RESPONSIVE DRAWER ---
 function vincularCheckboxCapa(chkId, getLayerFn) {
     document.getElementById(chkId)?.addEventListener('change', (e) => {
         const layer = getLayerFn();
@@ -611,20 +844,12 @@ function vincularCheckboxCapa(chkId, getLayerFn) {
         else map.removeLayer(layer);
     });
 }
-
 vincularCheckboxCapa('chkDistritos', () => layerDistritos);
 vincularCheckboxCapa('chkInundacion', () => layerInundacion);
 vincularCheckboxCapa('chkHuaycos', () => layerHuaycos);
 vincularCheckboxCapa('chkRios', () => layerRios);
 vincularCheckboxCapa('chkPuntosCriticos', () => layerPuntosCriticos);
 vincularCheckboxCapa('chkTopografia', () => rasterElevationLayer);
-
-window.toggleSideDrawer = function() {
-    const drawer = document.getElementById('sideDrawer');
-    const arrow = document.getElementById('drawerToggleArrow');
-    drawer.classList.toggle('drawer-open');
-    if (arrow) arrow.textContent = drawer.classList.contains('drawer-open') ? '▼' : '▲';
-};
 
 window.toggleLeyenda = function() {
     const body = document.getElementById('legendBody');
@@ -637,3 +862,32 @@ window.toggleLeyenda = function() {
 document.getElementById('btnOpenNormativa')?.addEventListener('click', () => {
     document.getElementById('normativaModal').style.display = 'flex';
 });
+
+// Navegación por pestañas en dispositivos móviles (<= 1024px)
+window.cambiarVistaMovil = function(vista, btnEl) {
+    document.querySelectorAll('.mob-tab-btn').forEach(b => b.classList.remove('active'));
+    if (btnEl) {
+        btnEl.classList.add('active');
+    } else {
+        const idx = vista === 'mapa' ? 0 : (vista === 'capas' ? 1 : 2);
+        document.querySelectorAll('.mob-tab-btn')[idx]?.classList.add('active');
+    }
+
+    const colLeft = document.getElementById('colLeft');
+    const colCenter = document.getElementById('colCenter');
+    const colRight = document.getElementById('colRight');
+
+    colLeft.classList.remove('mob-visible');
+    colRight.classList.remove('mob-visible');
+    colCenter.classList.remove('mob-hidden');
+
+    if (vista === 'capas') {
+        colLeft.classList.add('mob-visible');
+        colCenter.classList.add('mob-hidden');
+    } else if (vista === 'termico') {
+        colRight.classList.add('mob-visible');
+        colCenter.classList.add('mob-hidden');
+    } else {
+        setTimeout(() => map.invalidateSize(), 120);
+    }
+};
