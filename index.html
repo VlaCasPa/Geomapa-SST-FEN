@@ -25,7 +25,12 @@
                 <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.15v3.15C3.12 21.32 7.22 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.61H1.15C.42 8.08 0 9.73 0 12s.42 3.92 1.15 5.39l4.12-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.12 2.68 1.15 6.61l4.12 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/></svg>
                 Continuar con cuenta de Google
             </button>
-            <div class="gatekeeper-footer-note">Desarrollado por Vladimir Casas Palomino • Acceso abierto para especialistas SST.</div>
+
+            <div class="gatekeeper-author-box">
+                <span class="gk-author-label">Geomapa desarrollado por:</span>
+                <strong class="gk-author-name">Vladimir Casas Palomino</strong>
+                <span class="gk-author-sub">Arquitectura WebGIS &amp; Gestión Preventiva SST</span>
+            </div>
         </div>
     </div>
 
@@ -91,10 +96,11 @@
     <!-- ESPACIO DE TRABAJO DE 3 COLUMNAS -->
     <div class="workspace-3col">
         
-        <!-- COLUMNA 1 (IZQUIERDA): CAPAS CENEPRED, PUNTOS CRÍTICOS, DOCS Y AUTORÍA -->
+        <!-- COLUMNA 1 (IZQUIERDA): COMPACTA SIN SCROLL GENERAL + AUTORÍA SIEMPRE VISIBLE -->
         <aside id="colLeft" class="col-left">
-            <div class="col-scroll-content">
-                <section class="card-section">
+            <div class="col-left-body">
+                <!-- SECCIÓN 1: CAPAS TEMÁTICAS -->
+                <section class="card-section card-compact">
                     <div class="section-title-row">
                         <h3>🗺️ Capas Temáticas (CENEPRED)</h3>
                     </div>
@@ -132,15 +138,16 @@
                     </div>
                 </section>
 
-                <section class="card-section">
+                <!-- SECCIÓN 2: PUNTOS CRÍTICOS (FLEXIBLE CON SCROLL INTERNO) -->
+                <section class="card-section card-compact card-pc-flex">
                     <div class="section-title-row">
-                        <h3>⚠️ Puntos Críticos Identificados</h3>
+                        <h3>⚠️ Puntos Críticos</h3>
                         <span id="pcCounterBadge" class="count-badge">0</span>
                     </div>
-                    <div class="filter-row">
-                        <input type="text" id="filterPcText" class="compact-input" placeholder="Filtrar por distrito o vía...">
+                    <div class="filter-row-inline">
+                        <input type="text" id="filterPcText" class="compact-input" placeholder="Distrito o vía...">
                         <select id="filterPcRisk" class="compact-input">
-                            <option value="">Todos los niveles</option>
+                            <option value="">Nivel</option>
                             <option value="MUY ALTO">🔴 Muy Alto</option>
                             <option value="ALTO">🟠 Alto</option>
                             <option value="MEDIO">🟡 Medio</option>
@@ -149,33 +156,35 @@
                     <div id="puntosCriticosList" class="pc-list-container"></div>
                 </section>
 
-                <section class="card-section docs-card">
-                    <h3>📂 Documentación Oficial (Repo)</h3>
-                    <div class="doc-links">
-                        <a href="documentación/8777346-rm-n-341-2026-tr.pdf" target="_blank" class="doc-link-btn">📄 R.M. N.° 341-2026-TR (PDF)</a>
-                        <a href="documentación/8777346-protocolo-sst-ante-el-fen.pdf" target="_blank" class="doc-link-btn">📘 Protocolo SST FEN (PDF)</a>
-                        <button type="button" class="doc-link-btn doc-btn-action" onclick="abrirDashboardLineamientos()">📋 Lineamientos por Riesgo (Num. 9)</button>
-                        <button type="button" class="doc-link-btn doc-btn-action" onclick="abrirDashboardAnexo1()">📑 Matriz Operativa (Anexo 1)</button>
+                <!-- SECCIÓN 3: DOCUMENTACIÓN OFICIAL EN CUADRÍCULA 2x2 -->
+                <section class="card-section card-compact docs-card">
+                    <div class="section-title-row" style="margin-bottom: 5px;">
+                        <h3>📂 Documentación Oficial (Repo)</h3>
                     </div>
-                </section>
-
-                <!-- BLOQUE DE AUTORÍA Y COMENTARIOS PRIVADOS AL ADMINISTRADOR -->
-                <section class="card-section author-card">
-                    <div class="author-credit">
-                        <span class="author-label">DESARROLLO Y ARQUITECTURA GIS</span>
-                        <strong>Geomapa desarrollado por Vladimir Casas Palomino</strong>
-                    </div>
-                    <div class="author-actions">
-                        <button type="button" class="btn-feedback-user" onclick="abrirModalComentario()">
-                            💬 Dejar comentario al Administrador
-                        </button>
-                        <!-- SOLO VISIBLE PARA EL ADMINISTRADOR -->
-                        <button type="button" id="btnAdminInbox" class="btn-admin-inbox" style="display: none;" onclick="abrirBuzonAdmin()">
-                            🔐 Buzón Privado de Comentarios (Admin)
-                        </button>
+                    <div class="doc-links-grid">
+                        <a href="documentación/8777346-rm-n-341-2026-tr.pdf" target="_blank" class="doc-grid-btn" title="Resolución Ministerial N.° 341-2026-TR (PDF)">📄 R.M. 341 (PDF)</a>
+                        <a href="documentación/8777346-protocolo-sst-ante-el-fen.pdf" target="_blank" class="doc-grid-btn" title="Protocolo SST ante el FEN (PDF)">📘 Protocolo (PDF)</a>
+                        <button type="button" class="doc-grid-btn doc-btn-action" onclick="abrirDashboardLineamientos()" title="Lineamientos Técnicos por Riesgo (Numeral 9)">📋 Riesgos (Num. 9)</button>
+                        <button type="button" class="doc-grid-btn doc-btn-action" onclick="abrirDashboardAnexo1()" title="Matriz Operativa Mínima (Anexo 1)">📑 Matriz Anexo 1</button>
                     </div>
                 </section>
             </div>
+
+            <!-- PIE FIJO SIEMPRE VISIBLE: AUTORÍA Y COMENTARIOS PRIVADOS -->
+            <footer class="author-footer-fixed">
+                <div class="author-credit">
+                    <span class="author-prefix">Geomapa desarrollado por:</span>
+                    <strong class="author-fullname">Vladimir Casas Palomino</strong>
+                </div>
+                <div class="author-actions">
+                    <button type="button" class="btn-feedback-user" onclick="abrirModalComentario()">
+                        💬 Comentario al Administrador
+                    </button>
+                    <button type="button" id="btnAdminInbox" class="btn-admin-inbox" style="display: none;" onclick="abrirBuzonAdmin()">
+                        🔐 Buzón Admin
+                    </button>
+                </div>
+            </footer>
         </aside>
 
         <!-- COLUMNA 2 (CENTRO): VISOR GEOESPACIAL -->
@@ -588,6 +597,7 @@
                 <p><strong>1. Módulo Geoespacial (CENEPRED):</strong> Permite consultar distritos, escenarios de inundación, movimientos en masa, cuencas hidrográficas y puntos críticos viales actualizados en tiempo real en Lima y Callao.</p>
                 <p><strong>2. Módulo de Estrés Térmico (Numeral 9.1 - R.M. N.° 341-2026-TR):</strong> Integra las dos metodologías oficiales del Protocolo MTPE (Índice de Calor NWS/NOAA y TGBH Efectivo R.M. N.° 375-2008-TR) con las Tablas 1, 2, 3 y 4.</p>
                 <p><strong>3. Dashboards Normativos:</strong> Acceso directo desde la barra superior a los <strong>13 Lineamientos Técnicos por Riesgo (Numeral 9)</strong>, <strong>Criterios de Retorno Seguro (Numeral 11)</strong> y la <strong>Matriz Operativa Mínima (Anexo 1)</strong>.</p>
+                <p style="border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 0.78rem; color: #475569;"><strong>Autoría y Desarrollo:</strong> Vladimir Casas Palomino • Noviembre 2026.</p>
             </div>
             <div class="disclaimer-footer">
                 <button type="button" style="background:#1e293b;" onclick="cerrarModal('normativaModal')">ENTENDIDO, VOLVER AL MAPA</button>
@@ -597,7 +607,6 @@
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- PapaParse para lectura en vivo del CSV de Puntos Críticos -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
