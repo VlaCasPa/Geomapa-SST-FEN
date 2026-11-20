@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Geomapa SST FEN Perú | Visor Geoespacial Preventivo (R.M. N.° 341-2026-TR)</title>
+    <link rel="icon" href="data:,">
+    <title>Geomapa SST FEN Perú | Visor Geoespacial y Estrés Térmico (R.M. N.° 341-2026-TR)</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Estilos Propios -->
@@ -18,7 +19,7 @@
             <div class="gatekeeper-logo">🗺️</div>
             <h1>Geomapa SST FEN Perú</h1>
             <p class="gatekeeper-subtitle">Visor Geoespacial de Referencia para Seguridad y Salud en el Trabajo ante el Fenómeno El Niño</p>
-            <p class="gatekeeper-desc">Piloto Lima Metropolitana y Callao: cruce territorial de escenarios CENEPRED y puntos críticos con medidas preventivas del Protocolo SST del MTPE.</p>
+            <p class="gatekeeper-desc">Piloto Lima Metropolitana y Callao: cruce territorial de escenarios CENEPRED, puntos críticos y evaluación de estrés térmico por calor (Numeral 9.1 del Protocolo SST del MTPE).</p>
             
             <button type="button" class="btn-google-login" onclick="loginConGoogle()">
                 <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.15v3.15C3.12 21.32 7.22 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.61H1.15C.42 8.08 0 9.73 0 12s.42 3.92 1.15 5.39l4.12-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.12 2.68 1.15 6.61l4.12 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/></svg>
@@ -37,7 +38,7 @@
             </div>
             <div class="disclaimer-body">
                 <p><strong>1. Carácter Referencial:</strong> <em>Geomapa SST FEN Perú</em> es una herramienta digital de apoyo técnico y educativo desarrollada sobre modelos cartográficos oficiales a escala regional/distrital de <strong>CENEPRED</strong> y los lineamientos del <strong>Protocolo de Seguridad y Salud en el Trabajo ante el Fenómeno El Niño (R.M. N.° 341-2026-TR)</strong>.</p>
-                <p><strong>2. No Sustituye la Evaluación IPERC:</strong> Los niveles de susceptibilidad y medidas mostradas por ubicación sirven como orientación preliminar y <strong>no reemplazan</strong> la Identificación de Peligros, Evaluación de Riesgos y Determinación de Controles (IPERC) específica, las inspecciones técnicas de ingeniería ni el Plan de Preparación y Respuesta ante Emergencias que cada empleador debe implementar conforme a la <strong>Ley N.° 29783</strong> y su Reglamento (D.S. N.° 005-2012-TR).</p>
+                <p><strong>2. No Sustituye la Evaluación IPERC:</strong> Los niveles de susceptibilidad, cálculos térmicos referenciales y medidas mostradas sirven como orientación preliminar y <strong>no reemplazan</strong> la Identificación de Peligros, Evaluación de Riesgos y Determinación de Controles (IPERC) específica, las mediciones ocupacionales calibradas ni el Plan de Preparación y Respuesta ante Emergencias que cada empleador debe implementar conforme a la <strong>Ley N.° 29783</strong> y su Reglamento (D.S. N.° 005-2012-TR).</p>
                 <p><strong>3. Registro de Consentimiento:</strong> Al aceptar, se registrará su conformidad de uso referencial en el sistema.</p>
                 <label class="disclaimer-check-label">
                     <input type="checkbox" id="chk-acepto-terminos" onchange="toggleBotonDisclaimer()">
@@ -67,7 +68,7 @@
                 <button type="button" id="btnSearchAddress" title="Buscar dirección">🔍</button>
             </div>
             <button type="button" id="btnMyLocation" class="tool-btn" title="Usar mi ubicación GPS actual">📍 <span class="btn-label-desktop">Mi GPS</span></button>
-            <button type="button" id="btnDropPin" class="tool-btn tool-btn-accent" title="Activar modo pin para picar en el mapa">📌 <span class="btn-label-desktop">Picar Punto</span></button>
+            <button type="button" id="btnDropPin" class="tool-btn tool-btn-accent" title="Fijar pin en el centro del mapa">📌 <span class="btn-label-desktop">Picar Punto</span></button>
         </div>
 
         <div class="user-actions">
@@ -77,18 +78,19 @@
         </div>
     </header>
 
-    <!-- CONTENEDOR PRINCIPAL -->
-    <div class="workspace-container">
-        
-        <!-- PANEL LATERAL IZQUIERDO (CONTROLES Y PUNTOS CRÍTICOS) -->
-        <aside id="sideDrawer" class="side-drawer">
-            <div class="drawer-mobile-handle" onclick="toggleSideDrawer()">
-                <span>☰ Capas y Puntos Críticos</span>
-                <span id="drawerToggleArrow">▲</span>
-            </div>
+    <!-- BARRA DE NAVEGACIÓN MÓVIL (SOLO CELULARES <= 1024px) -->
+    <nav class="mobile-view-switcher">
+        <button type="button" class="mob-tab-btn active" onclick="cambiarVistaMovil('mapa', this)">🗺️ Mapa</button>
+        <button type="button" class="mob-tab-btn" onclick="cambiarVistaMovil('capas', this)">📑 Capas y Puntos</button>
+        <button type="button" class="mob-tab-btn" onclick="cambiarVistaMovil('termico', this)">🌡️ Estrés Térmico (9.1)</button>
+    </nav>
 
-            <div class="drawer-scroll-content">
-                <!-- SECCIÓN 1: CAPAS CARTOGRÁFICAS (TODAS DESACTIVADAS AL INICIO) -->
+    <!-- ESPACIO DE TRABAJO DE 3 COLUMNAS -->
+    <div class="workspace-3col">
+        
+        <!-- COLUMNA 1 (IZQUIERDA): CAPAS CENEPRED Y PUNTOS CRÍTICOS -->
+        <aside id="colLeft" class="col-left">
+            <div class="col-scroll-content">
                 <section class="card-section">
                     <div class="section-title-row">
                         <h3>🗺️ Capas Temáticas (CENEPRED)</h3>
@@ -127,7 +129,6 @@
                     </div>
                 </section>
 
-                <!-- SECCIÓN 2: FILTRO DE PUNTOS CRÍTICOS -->
                 <section class="card-section">
                     <div class="section-title-row">
                         <h3>⚠️ Puntos Críticos Identificados</h3>
@@ -145,7 +146,6 @@
                     <div id="puntosCriticosList" class="pc-list-container"></div>
                 </section>
 
-                <!-- SECCIÓN 3: ACCESO A DOCUMENTACIÓN OFICIAL -->
                 <section class="card-section docs-card">
                     <h3>📂 Documentación Oficial (Repo)</h3>
                     <div class="doc-links">
@@ -156,21 +156,20 @@
             </div>
         </aside>
 
-        <!-- ÁREA DEL MAPA -->
-        <main class="map-viewport">
+        <!-- COLUMNA 2 (CENTRO): VISOR GEOESPACIAL -->
+        <main id="colCenter" class="col-center">
             <div id="map"></div>
 
-            <!-- BANNER DE INSTRUCCIÓN RÁPIDA EN MAPA -->
             <div id="mapHintBanner" class="map-hint-banner">
-                <span>💡 <strong>Toca cualquier punto del mapa</strong> o activa las capas temáticas en el panel izquierdo para visualizar los escenarios CENEPRED.</span>
+                <span>💡 <strong>Toca el mapa</strong> para evaluar escenarios CENEPRED y sincronizar el clima en el panel térmico derecho.</span>
                 <button type="button" onclick="this.parentElement.style.display='none'">&times;</button>
             </div>
 
-            <!-- PANEL DE DIAGNÓSTICO SST EMERGENTE (FICHA TÉCNICA POR PUNTO) -->
-            <div id="diagnosticPanel" class="diagnostic-panel" style="display: none;">
+            <!-- FICHA FLOTANTE DE DIAGNÓSTICO TERRITORIAL (CENEPRED) -->
+            <div id="diagnosticPanel" class="diagnostic-floating-card" style="display: none;">
                 <div class="diag-header">
                     <div>
-                        <span class="diag-tag">DIAGNÓSTICO REFERENCIAL SST</span>
+                        <span class="diag-tag">DIAGNÓSTICO TERRITORIAL CENEPRED</span>
                         <h2 id="diagDistritoTitle">Ubicación Seleccionada</h2>
                     </div>
                     <button type="button" class="diag-close" onclick="cerrarDiagnostico()">&times;</button>
@@ -180,51 +179,226 @@
                     <div class="diag-meta" id="diagCoordsText">Lat: -12.0464 | Lon: -77.0428</div>
                     <div class="diag-address" id="diagAddressText">Consultando referencia territorial...</div>
 
-                    <!-- TARJETAS SEMÁFORO CENEPRED -->
                     <div class="risk-cards-grid">
                         <div class="risk-card" id="cardInundacion">
-                            <span class="risk-card-label">Inundaciones (CENEPRED)</span>
+                            <span class="risk-card-label">Inundaciones</span>
                             <strong class="risk-card-value" id="valInundacion">Evaluando...</strong>
                         </div>
                         <div class="risk-card" id="cardHuaycos">
-                            <span class="risk-card-label">Mov. en Masa (CENEPRED)</span>
+                            <span class="risk-card-label">Mov. en Masa</span>
                             <strong class="risk-card-value" id="valHuaycos">Evaluando...</strong>
                         </div>
                     </div>
 
-                    <!-- INTERPRETACIÓN OPERATIVA R.M. N.° 341-2026-TR -->
                     <div class="protocol-box">
-                        <div class="protocol-header">
-                            <strong>📋 Interpretación Operativa (R.M. N.° 341-2026-TR)</strong>
-                        </div>
                         <div class="phase-tabs">
-                            <button type="button" class="phase-tab active" onclick="cambiarFaseTab('antes', this)">1. Antes</button>
-                            <button type="button" class="phase-tab" onclick="cambiarFaseTab('durante', this)">2. Durante</button>
-                            <button type="button" class="phase-tab" onclick="cambiarFaseTab('despues', this)">3. Después</button>
+                            <button type="button" class="phase-tab active" onclick="cambiarFaseTab('antes', this)">Antes</button>
+                            <button type="button" class="phase-tab" onclick="cambiarFaseTab('durante', this)">Durante</button>
+                            <button type="button" class="phase-tab" onclick="cambiarFaseTab('despues', this)">Después</button>
                         </div>
                         <div id="protocolContent" class="protocol-content"></div>
                     </div>
 
-                    <div class="diag-actions">
-                        <button type="button" id="btnCopyReport" class="btn-copy-report" onclick="copiarDiagnosticoSST()">📋 Copiar Resumen para ATS / IPERC</button>
-                    </div>
+                    <button type="button" id="btnCopyReport" class="btn-copy-report" onclick="copiarDiagnosticoSST()">📋 Copiar Resumen Territorial</button>
                 </div>
             </div>
 
-            <!-- LEYENDA COMPACTA SST -->
+            <!-- LEYENDA COMPACTA -->
             <div class="map-legend-box">
                 <div class="legend-title" onclick="toggleLeyenda()">
-                    <span>Semáforo CENEPRED / SST</span>
+                    <span>Semáforo CENEPRED</span>
                     <span id="legendArrow">▼</span>
                 </div>
                 <div id="legendBody" class="legend-items">
-                    <div class="leg-row"><span class="leg-swatch" style="background:#dc2626;"></span>Muy Alto (Paralización / Evacuación)</div>
-                    <div class="leg-row"><span class="leg-swatch" style="background:#ea580c;"></span>Alto (Controles Críticos)</div>
-                    <div class="leg-row"><span class="leg-swatch" style="background:#eab308;"></span>Medio (Monitoreo Permanente)</div>
-                    <div class="leg-row"><span class="leg-swatch" style="background:#16a34a;"></span>Bajo (Prevención Estándar)</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#dc2626;"></span>Muy Alto</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#ea580c;"></span>Alto</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#eab308;"></span>Medio</div>
+                    <div class="leg-row"><span class="leg-swatch" style="background:#16a34a;"></span>Bajo</div>
                 </div>
             </div>
         </main>
+
+        <!-- COLUMNA 3 (DERECHA - 1/3 DE PANTALLA): ESTRÉS TÉRMICO POR CALOR (NUMERAL 9.1) -->
+        <aside id="colRight" class="col-right">
+            <div class="thermal-header">
+                <div>
+                    <span class="thermal-badge">NUMERAL 9.1 • R.M. N.° 341-2026-TR</span>
+                    <h2>🌡️ Estrés Térmico por Calor</h2>
+                </div>
+                <button type="button" class="btn-tables-modal" onclick="abrirModalTablasTermicas()" title="Ver Tablas 3 y 4 del Protocolo">📊 Tablas</button>
+            </div>
+
+            <!-- SELECTOR DE MÉTODO DE CÁLCULO -->
+            <div class="thermal-mode-tabs">
+                <button type="button" class="t-mode-btn active" onclick="cambiarModoTermico('hi', this)">Opción 2: Índice de Calor (NWS)</button>
+                <button type="button" class="t-mode-btn" onclick="cambiarModoTermico('tgbh', this)">Opción 1: TGBH Efectivo</button>
+            </div>
+
+            <div class="thermal-scroll-body">
+                
+                <!-- FORMULARIO OPCIÓN 2: ÍNDICE DE CALOR (TEMPERATURA + HUMEDAD) -->
+                <div id="formIndiceCalor" class="thermal-form-card">
+                    <div class="weather-sync-bar">
+                        <button type="button" id="btnFetchLocalWeather" class="btn-sync-weather" onclick="cargarClimaPuntoActual()">
+                            ☁️ Cargar clima del punto en mapa
+                        </button>
+                        <a href="https://www.senamhi.gob.pe/?p=monitoreo-regional" target="_blank" rel="noopener noreferrer" class="senamhi-ext-link" title="Verificar estación oficial SENAMHI">
+                            SENAMHI ↗
+                        </a>
+                    </div>
+                    <div id="weatherSourceNote" class="weather-note">Ingrese valores de estación SENAMHI o cargue desde el mapa.</div>
+
+                    <div class="input-grid-2">
+                        <div class="t-field">
+                            <label for="hiTempC">Temp. Aire (°C):</label>
+                            <input type="number" id="hiTempC" step="0.1" value="30.3" oninput="calcularIndiceCalor()">
+                        </div>
+                        <div class="t-field">
+                            <label for="hiHumidity">Humedad Rel. (%):</label>
+                            <input type="number" id="hiHumidity" step="1" min="0" max="100" value="58" oninput="calcularIndiceCalor()">
+                        </div>
+                    </div>
+
+                    <label class="solar-check-box">
+                        <input type="checkbox" id="hiDirectSun" checked onchange="calcularIndiceCalor()">
+                        <div>
+                            <strong>Exposición bajo sol directo (+8,3 °C)</strong>
+                            <span>Ajuste máximo aproximado (Paso 3, Protocolo MTPE).</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- FORMULARIO OPCIÓN 1: TGBH EFECTIVO (R.M. N.° 375-2008-TR) -->
+                <div id="formTGBH" class="thermal-form-card" style="display: none;">
+                    <div class="t-field" style="margin-bottom: 8px;">
+                        <label for="tgbhCondicion">Condición de Exposición Solar:</label>
+                        <select id="tgbhCondicion" onchange="calcularTGBH()">
+                            <option value="sol">Al aire libre CON carga solar (0.7 TBH + 0.2 TG + 0.1 TBS)</option>
+                            <option value="sombra">Bajo techo o SIN carga solar (0.7 TBH + 0.3 TG)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-grid-3">
+                        <div class="t-field">
+                            <label for="valTBH">TBH (°C):</label>
+                            <input type="number" id="valTBH" step="0.1" value="24.0" oninput="calcularTGBH()">
+                        </div>
+                        <div class="t-field">
+                            <label for="valTG">TG (°C):</label>
+                            <input type="number" id="valTG" step="0.1" value="36.0" oninput="calcularTGBH()">
+                        </div>
+                        <div class="t-field" id="fieldTBS">
+                            <label for="valTBS">TBS (°C):</label>
+                            <input type="number" id="valTBS" step="0.1" value="30.0" oninput="calcularTGBH()">
+                        </div>
+                    </div>
+
+                    <div class="t-field" style="margin-top: 8px;">
+                        <label for="tgbhRopa">Factor de Ajuste por Ropa / EPP (Tabla 2):</label>
+                        <select id="tgbhRopa" onchange="calcularTGBH()">
+                            <option value="0">+0 °C — Ropa de trabajo convencional (camisa/pantalón)</option>
+                            <option value="0">+0 °C — Mameluco de trabajo de tela/algodón</option>
+                            <option value="0">+0 °C — Mameluco no tejido Notex/SMS (1 capa)</option>
+                            <option value="2">+2 °C — Mameluco no tejido poliolefinas / Tyvek (1 capa)</option>
+                            <option value="3" selected>+3 °C — Doble capa de tejido (mameluco sobre ropa)</option>
+                            <option value="4">+4 °C — Mandil largo manga larga impermeable sobre mameluco</option>
+                            <option value="10">+10 °C — Mameluco resistente al vapor sin capucha (1 capa)</option>
+                            <option value="11">+11 °C — Mameluco resistente al vapor con capucha (1 capa)</option>
+                            <option value="12">+12 °C — Mameluco resistente al vapor sin capucha (sobre ropa)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-grid-2" style="margin-top: 8px;">
+                        <div class="t-field">
+                            <label for="tgbhCarga">Tipo de Trabajo (Tabla 3):</label>
+                            <select id="tgbhCarga" onchange="calcularTGBH()">
+                                <option value="ligero">Ligero</option>
+                                <option value="moderado" selected>Moderado</option>
+                                <option value="pesado">Pesado</option>
+                                <option value="muypesado">Muy pesado</option>
+                            </select>
+                        </div>
+                        <div class="t-field">
+                            <label for="tgbhAclimatacion">Aclimatación:</label>
+                            <select id="tgbhAclimatacion" onchange="calcularTGBH()">
+                                <option value="no">No aclimatado</option>
+                                <option value="si">Aclimatado</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RESULTADO E INTERPRETACIÓN AUTOMÁTICA DEL PROTOCOLO -->
+                <div id="thermalResultPanel" class="thermal-result-card">
+                    <div class="result-banner" id="thermalBanner">
+                        <div>
+                            <span class="result-subtitle" id="thermalMethodLabel">ÍNDICE DE CALOR EFECTIVO</span>
+                            <div class="result-big-number" id="thermalMainValue">41.3 °C</div>
+                            <span class="result-detail-sub" id="thermalSubValue">Base sombra: 33.0 °C + 8.3 °C sol directo</span>
+                        </div>
+                        <div class="result-risk-pill" id="thermalRiskBadge">RIESGO ALTO</div>
+                    </div>
+
+                    <!-- ALERTA DE VALOR DE ACCIÓN (SOLO MODO TGBH - TABLA 3) -->
+                    <div id="tgbhActionBox" class="tgbh-action-alert" style="display: none;"></div>
+
+                    <!-- IMPACTO EN LA SALUD -->
+                    <div class="interp-block">
+                        <h4>🩺 Impacto en la Salud</h4>
+                        <p id="thermalHealthText">Aumenta considerablemente la posibilidad de calambres y agotamiento por calor; puede presentarse golpe de calor.</p>
+                    </div>
+
+                    <!-- MEDIDAS DE CONTROL OBLIGATORIAS (PROTOCOLO MTPE) -->
+                    <div class="interp-block">
+                        <h4>🛡️ Medidas de Control y Decisión Preventiva</h4>
+                        <ul id="thermalControlsList"></ul>
+                    </div>
+
+                    <button type="button" id="btnCopyThermal" class="btn-copy-thermal" onclick="copiarReporteTermico()">
+                        📋 Copiar Evaluación Térmica (ATS / IPERC)
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODAL TABLAS OFICIALES DEL PROTOCOLO (TABLAS 3 Y 4) -->
+    <div id="tablasTermicasModal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="disclaimer-card" style="max-width: 820px;">
+            <div class="disclaimer-header" style="background:#0f172a;">
+                <h3>📊 Tablas Oficiales de Estrés Térmico — Protocolo MTPE (R.M. N.° 341-2026-TR)</h3>
+            </div>
+            <div class="disclaimer-body" style="max-height: 70vh; overflow-y: auto; font-size: 0.8rem;">
+                <h4>Tabla 4: Matriz de riesgo Índice de calor (NWS / OSHA)</h4>
+                <table class="protocol-table">
+                    <thead>
+                        <tr><th>Riesgo</th><th>Índice de calor efectivo</th><th>Impacto en la Salud</th><th>Medidas de control</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="background:#16a34a;color:#fff;font-weight:bold;">Bajo</td><td>26,7 °C a 32,2 °C</td><td>Puede aparecer fatiga con exposición prolongada o esfuerzo físico.</td><td>Mantener agua potable, sombra, vigilancia de síntomas y pausas apropiadas. Considerar carga física y aclimatación.</td></tr>
+                        <tr><td style="background:#eab308;color:#0f172a;font-weight:bold;">Medio</td><td>32,2 °C a 39,4 °C</td><td>Posibles calambres, agotamiento por calor y golpe de calor, especialmente con esfuerzo físico.</td><td>Incrementar pausas en lugares frescos, reducir esfuerzo físico y reforzar supervisión. Considerar límites y aclimatación.</td></tr>
+                        <tr><td style="background:#ea580c;color:#fff;font-weight:bold;">Alto</td><td>39,4 °C a 51,1 °C</td><td>Aumenta considerablemente posibilidad de calambres y agotamiento; puede presentarse golpe de calor.</td><td>Aplicar controles intensificados, reducir duración de exposición y carga física. Considerar límites y aclimatación.</td></tr>
+                        <tr><td style="background:#dc2626;color:#fff;font-weight:bold;">Muy alto</td><td>51,7 °C o más</td><td>Condiciones de calor extremo, con riesgo muy elevado de enfermedad grave por calor.</td><td>Evitar exposición no controlada, suspender o reprogramar tareas que no puedan ejecutarse con controles eficaces.</td></tr>
+                    </tbody>
+                </table>
+
+                <h4 style="margin-top: 12px;">Tabla 3: Límites de exposición (TGBH efectivo, tipo de trabajo y aclimatación)</h4>
+                <table class="protocol-table">
+                    <thead>
+                        <tr><th>Tipo de trabajo</th><th>No aclimatado: valor de acción</th><th>Aclimatado: valor de acción</th><th>Decisión preventiva</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Ligero</strong></td><td>28 °C</td><td>30 °C</td><td>Al alcanzar el valor aplicable, evaluar y reforzar controles; no asumir que la tarea es segura solo por ser ligera.</td></tr>
+                        <tr><td><strong>Moderado</strong></td><td>25 °C</td><td>28 °C</td><td>Reducir la exposición térmica, organizar pausas y reevaluar la tarea.</td></tr>
+                        <tr><td><strong>Pesado</strong></td><td>23 °C</td><td>26 °C</td><td>Priorizar reducción del esfuerzo, pausas más frecuentes y trabajo en horas menos calurosas; reevaluar antes de continuar.</td></tr>
+                        <tr><td><strong>Muy pesado</strong></td><td>21 °C</td><td>25 °C</td><td>Aplicar controles reforzados desde valores bajos; considerar suspensión o reprogramación si no se puede reducir suficientemente la exposición.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="disclaimer-footer">
+                <button type="button" style="background:#0f172a;" onclick="document.getElementById('tablasTermicasModal').style.display='none'">CERRAR TABLAS</button>
+            </div>
+        </div>
     </div>
 
     <!-- MODAL GUÍA NORMATIVA -->
@@ -234,19 +408,12 @@
                 <h3>📘 Guía Técnica y Base Normativa — Geomapa SST FEN Perú</h3>
             </div>
             <div class="disclaimer-body" style="max-height: 65vh; overflow-y: auto;">
-                <p><strong>Propósito de la Herramienta:</strong> Facilitar a empleadores, servicios de SST y Comités de Seguridad y Salud en el Trabajo (CSST) la identificación geográfica preliminar de exposición ante lluvias intensas, inundaciones y movimientos en masa en Lima Metropolitana y el Callao.</p>
-                <p><strong>Marco Legal Peruano Aplicable:</strong></p>
+                <p><strong>1. Módulo Geoespacial (CENEPRED):</strong> Permite consultar distritos, escenarios de inundación, movimientos en masa, cuencas hidrográficas y puntos críticos viales en Lima y Callao.</p>
+                <p><strong>2. Módulo de Estrés Térmico (Numeral 9.1 - R.M. N.° 341-2026-TR):</strong> Integra las dos metodologías oficiales del Protocolo del MTPE:</p>
                 <ul style="padding-left: 18px; line-height: 1.6;">
-                    <li><strong>R.M. N.° 341-2026-TR:</strong> Protocolo de Seguridad y Salud en el Trabajo ante el Fenómeno El Niño (MTPE).</li>
-                    <li><strong>Ley N.° 29783 y D.S. N.° 005-2012-TR:</strong> Ley de Seguridad y Salud en el Trabajo (Art. 57 IPERC, Art. 63 Paralización por peligro inminente, Art. 83 Preparación y respuesta ante emergencias).</li>
-                    <li><strong>CENEPRED / SINAGERD:</strong> Escenarios de riesgo por lluvias intensas, inundaciones y movimientos en masa.</li>
+                    <li><strong>Índice de Calor (NWS/NOAA):</strong> Herramienta de alerta temprana y seguimiento con temperatura del aire (°C) y humedad relativa (%). Permite añadir hasta +8,3 °C por exposición solar directa.</li>
+                    <li><strong>TGBH Efectivo (R.M. N.° 375-2008-TR):</strong> Evaluación cuantitativa ocupacional combinando TBH, TG, TBS, ajuste por ropa/EPP (Tabla 2), aclimatación y carga metabólica (Tabla 3).</li>
                 </ul>
-                <p><strong>¿Cómo usar el Geomapa?</strong></p>
-                <ol style="padding-left: 18px; line-height: 1.6;">
-                    <li>Activa en el panel izquierdo las capas temáticas que desees visualizar (Distritos, Inundaciones, Movimientos en Masa, Ríos, Puntos Críticos o Relieve MDE).</li>
-                    <li>Escribe la dirección de tu centro de trabajo en la barra superior, usa tu GPS o haz clic/tap directamente sobre cualquier punto del mapa.</li>
-                    <li>Consulta las acciones obligatorias por fase (<em>Antes, Durante y Después</em>) y copia el diagnóstico para documentar tu ATS, IPERC o inspección preventiva.</li>
-                </ol>
             </div>
             <div class="disclaimer-footer">
                 <button type="button" style="background:#1e293b;" onclick="document.getElementById('normativaModal').style.display='none'">ENTENDIDO, VOLVER AL MAPA</button>
