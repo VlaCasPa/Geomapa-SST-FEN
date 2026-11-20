@@ -97,7 +97,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- 3. INICIALIZACIÓN DEL MAPA EN ESCALA DE GRISES ---
+// --- 3. INICIALIZACIÓN DEL MAPA EN ESCALA DE GRISES (LIMPIO AL INICIO) ---
 const map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 11);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
@@ -137,11 +137,11 @@ function getTextColor(nivel) {
     return '#ffffff';
 }
 
-// --- 5. DATOS VECTORIALES Y RÁSTER DE LIMA Y CALLAO ---
+// --- 5. DATOS VECTORIALES Y RÁSTER DE LIMA Y CALLAO (CARGA EN MEMORIA, APAGADOS AL INICIO) ---
 const baseUrl = 'datos_vectoriales/';
 let geoDistritos = null, geoInundacion = null, geoHuaycos = null;
 let layerDistritos = null, layerInundacion = null, layerHuaycos = null, layerRios = null;
-let layerPuntosCriticos = L.layerGroup().addTo(map);
+let layerPuntosCriticos = L.layerGroup(); // Sin .addTo(map) inicial
 let rasterElevationLayer = null;
 let rawOriginBounds = null;
 
@@ -189,7 +189,7 @@ fetch('datos_raster/elevacion.pgw')
         }
     }).catch(() => {});
 
-// Carga de Polígonos Distritales
+// Carga de Polígonos Distritales (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'DISTRITOS%20DE%20LIMA%20Y%20CALLAO.geojson')
     .then(res => res.json())
     .then(data => {
@@ -201,10 +201,10 @@ fetch(baseUrl + 'DISTRITOS%20DE%20LIMA%20Y%20CALLAO.geojson')
                 layer.bindTooltip(`Distrito: <b>${dist}</b>`, { sticky: true });
                 layer.on('click', (e) => evaluarPuntoEnMapa(e.latlng.lat, e.latlng.lng));
             }
-        }).addTo(map);
+        });
     });
 
-// Carga de Escenario Inundación CENEPRED
+// Carga de Escenario Inundación CENEPRED (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'PELIGRO%20INUNDACION%20LIMA%20Y%20CALLAO.geojson')
     .then(res => res.json())
     .then(data => {
@@ -219,10 +219,10 @@ fetch(baseUrl + 'PELIGRO%20INUNDACION%20LIMA%20Y%20CALLAO.geojson')
             onEachFeature: (feature, layer) => {
                 layer.on('click', (e) => evaluarPuntoEnMapa(e.latlng.lat, e.latlng.lng));
             }
-        }).addTo(map);
+        });
     });
 
-// Carga de Escenario Movimientos en Masa CENEPRED
+// Carga de Escenario Movimientos en Masa CENEPRED (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'PELIGRO%20MOVIMIENTOS%20EN%20MASAS%20LIMA%20Y%20CALLAO.geojson')
     .then(res => res.json())
     .then(data => {
@@ -240,13 +240,13 @@ fetch(baseUrl + 'PELIGRO%20MOVIMIENTOS%20EN%20MASAS%20LIMA%20Y%20CALLAO.geojson'
         });
     });
 
-// Carga de Ríos Rímac y Chillón
+// Carga de Ríos Rímac y Chillón (en memoria; se dibuja al marcar checkbox)
 fetch(baseUrl + 'RIOS%20RIMAC%20CHILLON.geojson')
     .then(res => res.json())
     .then(data => {
         layerRios = L.geoJSON(data, {
             style: { color: '#0284c7', weight: 3, opacity: 0.85 }
-        }).addTo(map);
+        });
     });
 
 // --- 6. DATASET DE 23 PUNTOS CRÍTICOS VIALES (LIMA Y CALLAO) ---
@@ -314,6 +314,12 @@ function renderizarPuntosCriticos(filtrados = puntosCriticosDataset) {
                 </div>
             `;
             card.addEventListener('click', () => {
+                // Activa automáticamente la capa de puntos críticos si estaba apagada
+                const chkPc = document.getElementById('chkPuntosCriticos');
+                if (chkPc && !chkPc.checked) {
+                    chkPc.checked = true;
+                    layerPuntosCriticos.addTo(map);
+                }
                 map.setView([pt.lat, pt.lon], 15);
                 evaluarPuntoEnMapa(pt.lat, pt.lon, {
                     titulo: pt.name,
@@ -492,7 +498,6 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
 
     renderizarContenidoFase();
 
-    // Geocodificación inversa (si no viene dirección fija)
     if (!opciones.direccion) {
         try {
             const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
@@ -505,7 +510,6 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
         }
     }
 
-    // Registro anónimo de consulta en Firestore para analítica
     if (currentUser) {
         try {
             await addDoc(collection(db, "consultas_mapa"), {
