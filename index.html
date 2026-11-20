@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" href="data:,">
-    <title>Geomapa SST FEN Perú | Visor Geoespacial y Estrés Térmico (R.M. N.° 341-2026-TR)</title>
+    <title>Geomapa SST FEN Perú | Visor Geoespacial y Protocolo MTPE (R.M. N.° 341-2026-TR)</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Estilos Propios -->
@@ -19,13 +19,13 @@
             <div class="gatekeeper-logo">🗺️</div>
             <h1>Geomapa SST FEN Perú</h1>
             <p class="gatekeeper-subtitle">Visor Geoespacial de Referencia para Seguridad y Salud en el Trabajo ante el Fenómeno El Niño</p>
-            <p class="gatekeeper-desc">Piloto Lima Metropolitana y Callao: cruce territorial de escenarios CENEPRED, puntos críticos y evaluación de estrés térmico por calor (Numeral 9.1 del Protocolo SST del MTPE).</p>
+            <p class="gatekeeper-desc">Piloto Lima Metropolitana y Callao: cruce territorial de escenarios CENEPRED, puntos críticos, estrés térmico (Num. 9.1), lineamientos por riesgo y Matriz Operativa Anexo 1.</p>
             
             <button type="button" class="btn-google-login" onclick="loginConGoogle()">
                 <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.15v3.15C3.12 21.32 7.22 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.61H1.15C.42 8.08 0 9.73 0 12s.42 3.92 1.15 5.39l4.12-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.12 2.68 1.15 6.61l4.12 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/></svg>
                 Continuar con cuenta de Google
             </button>
-            <div class="gatekeeper-footer-note">Acceso abierto para especialistas SST, miembros de CSST y gestores operativos.</div>
+            <div class="gatekeeper-footer-note">Desarrollado por Vladimir Casas Palomino • Acceso abierto para especialistas SST.</div>
         </div>
     </div>
 
@@ -68,11 +68,14 @@
                 <button type="button" id="btnSearchAddress" title="Buscar dirección">🔍</button>
             </div>
             <button type="button" id="btnMyLocation" class="tool-btn" title="Usar mi ubicación GPS actual">📍 <span class="btn-label-desktop">Mi GPS</span></button>
-            <button type="button" id="btnDropPin" class="tool-btn tool-btn-accent" title="Fijar pin en el centro del mapa">📌 <span class="btn-label-desktop">Picar Punto</span></button>
+            <button type="button" id="btnDropPin" class="tool-btn tool-btn-accent" title="Fijar pin en el centro del mapa">📌 <span class="btn-label-desktop">Picar</span></button>
         </div>
 
+        <!-- ACCESOS A DASHBOARDS NORMATIVOS Y SESIÓN -->
         <div class="user-actions">
-            <button type="button" id="btnOpenNormativa" class="nav-icon-btn" title="Base Normativa y Guía">📘 <span class="btn-label-desktop">Guía</span></button>
+            <button type="button" class="nav-dash-btn" onclick="abrirDashboardLineamientos()" title="Dashboard de Lineamientos Técnicos por Riesgo (Numeral 9)">📋 <span class="btn-label-desktop">Lineamientos</span></button>
+            <button type="button" class="nav-dash-btn nav-dash-anexo" onclick="abrirDashboardAnexo1()" title="Dashboard Anexo 1: Matriz Operativa Mínima">📑 <span class="btn-label-desktop">Anexo 1</span></button>
+            <button type="button" id="btnOpenNormativa" class="nav-icon-btn" title="Base Normativa y Guía">📘</button>
             <span id="userEmailBadge" class="user-pill" title="Usuario autenticado">🟢 Conectado</span>
             <button type="button" onclick="cerrarSesion()" class="nav-icon-btn btn-logout" title="Cerrar sesión">Salir</button>
         </div>
@@ -81,14 +84,14 @@
     <!-- BARRA DE NAVEGACIÓN MÓVIL (SOLO CELULARES <= 1024px) -->
     <nav class="mobile-view-switcher">
         <button type="button" class="mob-tab-btn active" onclick="cambiarVistaMovil('mapa', this)">🗺️ Mapa</button>
-        <button type="button" class="mob-tab-btn" onclick="cambiarVistaMovil('capas', this)">📑 Capas y Puntos</button>
-        <button type="button" class="mob-tab-btn" onclick="cambiarVistaMovil('termico', this)">🌡️ Estrés Térmico (9.1)</button>
+        <button type="button" class="mob-tab-btn" onclick="cambiarVistaMovil('capas', this)">📑 Capas</button>
+        <button type="button" class="mob-tab-btn" onclick="cambiarVistaMovil('termico', this)">🌡️ Térmico</button>
     </nav>
 
     <!-- ESPACIO DE TRABAJO DE 3 COLUMNAS -->
     <div class="workspace-3col">
         
-        <!-- COLUMNA 1 (IZQUIERDA): CAPAS CENEPRED Y PUNTOS CRÍTICOS -->
+        <!-- COLUMNA 1 (IZQUIERDA): CAPAS CENEPRED, PUNTOS CRÍTICOS, DOCS Y AUTORÍA -->
         <aside id="colLeft" class="col-left">
             <div class="col-scroll-content">
                 <section class="card-section">
@@ -119,7 +122,7 @@
                         <label class="layer-item">
                             <input type="checkbox" id="chkPuntosCriticos">
                             <span class="layer-dot" style="background:#b91c1c;"></span>
-                            <span>Puntos Críticos Viales (23 sectores)</span>
+                            <span>Puntos Críticos Viales (En Vivo)</span>
                         </label>
                         <label class="layer-item">
                             <input type="checkbox" id="chkTopografia">
@@ -132,7 +135,7 @@
                 <section class="card-section">
                     <div class="section-title-row">
                         <h3>⚠️ Puntos Críticos Identificados</h3>
-                        <span id="pcCounterBadge" class="count-badge">23</span>
+                        <span id="pcCounterBadge" class="count-badge">0</span>
                     </div>
                     <div class="filter-row">
                         <input type="text" id="filterPcText" class="compact-input" placeholder="Filtrar por distrito o vía...">
@@ -151,6 +154,25 @@
                     <div class="doc-links">
                         <a href="documentación/8777346-rm-n-341-2026-tr.pdf" target="_blank" class="doc-link-btn">📄 R.M. N.° 341-2026-TR (PDF)</a>
                         <a href="documentación/8777346-protocolo-sst-ante-el-fen.pdf" target="_blank" class="doc-link-btn">📘 Protocolo SST FEN (PDF)</a>
+                        <button type="button" class="doc-link-btn doc-btn-action" onclick="abrirDashboardLineamientos()">📋 Lineamientos por Riesgo (Num. 9)</button>
+                        <button type="button" class="doc-link-btn doc-btn-action" onclick="abrirDashboardAnexo1()">📑 Matriz Operativa (Anexo 1)</button>
+                    </div>
+                </section>
+
+                <!-- BLOQUE DE AUTORÍA Y COMENTARIOS PRIVADOS AL ADMINISTRADOR -->
+                <section class="card-section author-card">
+                    <div class="author-credit">
+                        <span class="author-label">DESARROLLO Y ARQUITECTURA GIS</span>
+                        <strong>Geomapa desarrollado por Vladimir Casas Palomino</strong>
+                    </div>
+                    <div class="author-actions">
+                        <button type="button" class="btn-feedback-user" onclick="abrirModalComentario()">
+                            💬 Dejar comentario al Administrador
+                        </button>
+                        <!-- SOLO VISIBLE PARA EL ADMINISTRADOR -->
+                        <button type="button" id="btnAdminInbox" class="btn-admin-inbox" style="display: none;" onclick="abrirBuzonAdmin()">
+                            🔐 Buzón Privado de Comentarios (Admin)
+                        </button>
                     </div>
                 </section>
             </div>
@@ -225,7 +247,7 @@
                     <span class="thermal-badge">NUMERAL 9.1 • R.M. N.° 341-2026-TR</span>
                     <h2>🌡️ Estrés Térmico por Calor</h2>
                 </div>
-                <button type="button" class="btn-tables-modal" onclick="abrirModalTablasTermicas()" title="Ver Tablas 3 y 4 del Protocolo">📊 Tablas</button>
+                <button type="button" class="btn-tables-modal" onclick="abrirModalTablasTermicas()" title="Ver Tablas 1, 2, 3 y 4 del Protocolo">📊 Tablas</button>
             </div>
 
             <!-- SELECTOR DE MÉTODO DE CÁLCULO -->
@@ -235,8 +257,7 @@
             </div>
 
             <div class="thermal-scroll-body">
-                
-                <!-- FORMULARIO OPCIÓN 2: ÍNDICE DE CALOR (TEMPERATURA + HUMEDAD) -->
+                <!-- FORMULARIO OPCIÓN 2: ÍNDICE DE CALOR -->
                 <div id="formIndiceCalor" class="thermal-form-card">
                     <div class="weather-sync-bar">
                         <button type="button" id="btnFetchLocalWeather" class="btn-sync-weather" onclick="cargarClimaPuntoActual()">
@@ -268,7 +289,7 @@
                     </label>
                 </div>
 
-                <!-- FORMULARIO OPCIÓN 1: TGBH EFECTIVO (R.M. N.° 375-2008-TR) -->
+                <!-- FORMULARIO OPCIÓN 1: TGBH EFECTIVO -->
                 <div id="formTGBH" class="thermal-form-card" style="display: none;">
                     <div class="t-field" style="margin-bottom: 8px;">
                         <label for="tgbhCondicion">Condición de Exposición Solar:</label>
@@ -328,27 +349,24 @@
                     </div>
                 </div>
 
-                <!-- RESULTADO E INTERPRETACIÓN AUTOMÁTICA DEL PROTOCOLO -->
+                <!-- RESULTADO E INTERPRETACIÓN AUTOMÁTICA -->
                 <div id="thermalResultPanel" class="thermal-result-card">
                     <div class="result-banner" id="thermalBanner">
                         <div>
                             <span class="result-subtitle" id="thermalMethodLabel">ÍNDICE DE CALOR EFECTIVO</span>
                             <div class="result-big-number" id="thermalMainValue">41.3 °C</div>
-                            <span class="result-detail-sub" id="thermalSubValue">Base sombra: 33.0 °C + 8.3 °C sol directo</span>
+                            <span class="result-detail-sub" id="thermalSubValue">Sombra: 33.0 °C + 8.3 °C sol directo</span>
                         </div>
                         <div class="result-risk-pill" id="thermalRiskBadge">RIESGO ALTO</div>
                     </div>
 
-                    <!-- ALERTA DE VALOR DE ACCIÓN (SOLO MODO TGBH - TABLA 3) -->
                     <div id="tgbhActionBox" class="tgbh-action-alert" style="display: none;"></div>
 
-                    <!-- IMPACTO EN LA SALUD -->
                     <div class="interp-block">
                         <h4>🩺 Impacto en la Salud</h4>
                         <p id="thermalHealthText">Aumenta considerablemente la posibilidad de calambres y agotamiento por calor; puede presentarse golpe de calor.</p>
                     </div>
 
-                    <!-- MEDIDAS DE CONTROL OBLIGATORIAS (PROTOCOLO MTPE) -->
                     <div class="interp-block">
                         <h4>🛡️ Medidas de Control y Decisión Preventiva</h4>
                         <ul id="thermalControlsList"></ul>
@@ -362,41 +380,200 @@
         </aside>
     </div>
 
-    <!-- MODAL TABLAS OFICIALES DEL PROTOCOLO (TABLAS 3 Y 4) -->
+    <!-- =========================================================
+         MODAL 1: TABLAS OFICIALES DE ESTRÉS TÉRMICO (TABLAS 1, 2, 3 Y 4)
+         ========================================================= -->
     <div id="tablasTermicasModal" class="modal-overlay-gatekeeper" style="display: none;">
-        <div class="disclaimer-card" style="max-width: 820px;">
-            <div class="disclaimer-header" style="background:#0f172a;">
-                <h3>📊 Tablas Oficiales de Estrés Térmico — Protocolo MTPE (R.M. N.° 341-2026-TR)</h3>
+        <div class="dashboard-modal-card">
+            <div class="dash-modal-header">
+                <div>
+                    <span class="dash-tag">NUMERAL 9.1 • R.M. N.° 341-2026-TR</span>
+                    <h3>📊 Tablas Oficiales de Estrés Térmico por Calor (Tablas 1, 2, 3 y 4)</h3>
+                </div>
+                <button type="button" class="dash-close-btn" onclick="cerrarModal('tablasTermicasModal')">&times;</button>
             </div>
-            <div class="disclaimer-body" style="max-height: 70vh; overflow-y: auto; font-size: 0.8rem;">
-                <h4>Tabla 4: Matriz de riesgo Índice de calor (NWS / OSHA)</h4>
-                <table class="protocol-table">
-                    <thead>
-                        <tr><th>Riesgo</th><th>Índice de calor efectivo</th><th>Impacto en la Salud</th><th>Medidas de control</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td style="background:#16a34a;color:#fff;font-weight:bold;">Bajo</td><td>26,7 °C a 32,2 °C</td><td>Puede aparecer fatiga con exposición prolongada o esfuerzo físico.</td><td>Mantener agua potable, sombra, vigilancia de síntomas y pausas apropiadas. Considerar carga física y aclimatación.</td></tr>
-                        <tr><td style="background:#eab308;color:#0f172a;font-weight:bold;">Medio</td><td>32,2 °C a 39,4 °C</td><td>Posibles calambres, agotamiento por calor y golpe de calor, especialmente con esfuerzo físico.</td><td>Incrementar pausas en lugares frescos, reducir esfuerzo físico y reforzar supervisión. Considerar límites y aclimatación.</td></tr>
-                        <tr><td style="background:#ea580c;color:#fff;font-weight:bold;">Alto</td><td>39,4 °C a 51,1 °C</td><td>Aumenta considerablemente posibilidad de calambres y agotamiento; puede presentarse golpe de calor.</td><td>Aplicar controles intensificados, reducir duración de exposición y carga física. Considerar límites y aclimatación.</td></tr>
-                        <tr><td style="background:#dc2626;color:#fff;font-weight:bold;">Muy alto</td><td>51,7 °C o más</td><td>Condiciones de calor extremo, con riesgo muy elevado de enfermedad grave por calor.</td><td>Evitar exposición no controlada, suspender o reprogramar tareas que no puedan ejecutarse con controles eficaces.</td></tr>
-                    </tbody>
-                </table>
+            <div class="dash-modal-body">
+                <h4 class="table-section-heading">Tabla 1: Matriz de riesgo TGBH (Evaluación inicial simplificada)</h4>
+                <div class="table-responsive-wrap">
+                    <table class="protocol-table">
+                        <thead>
+                            <tr><th>Riesgo</th><th>Rango TGBH (°C)</th><th>Impacto en la Salud</th><th>Medidas de control</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td class="cell-bajo">Bajo</td><td>Menor a 21 °C</td><td>Menor probabilidad de enfermedad por calor bajo las condiciones evaluadas. No se descarta el riesgo si hay esfuerzo intenso o EPP restrictivo.</td><td>Mantener controles preventivos y agua potable disponible. Vigilancia de las condiciones ambientales.</td></tr>
+                            <tr><td class="cell-medio">Medio</td><td>21 °C a 25 °C</td><td>El esfuerzo intenso puede generar una carga térmica peligrosa, especialmente en personas no aclimatadas.</td><td>Reducir el esfuerzo o aumentar pausas cuando corresponda. Considerar límites según tipo de trabajo y aclimatación.</td></tr>
+                            <tr><td class="cell-alto">Alto</td><td>25 °C a 28 °C</td><td>Aumenta la posibilidad de acumulación de calor corporal y trastornos por calor, especialmente en tareas moderadas o pesadas y no aclimatados.</td><td>Aplicar pausas en zonas frescas, hidratación y vigilancia de síntomas. Considerar límites según tipo de trabajo y aclimatación.</td></tr>
+                            <tr><td class="cell-muy-alto">Muy alto</td><td>Mayor a 28 °C</td><td>Puede existir exposición peligrosa incluso en trabajos de menor intensidad, según aclimatación y vestimenta.</td><td>Reducir exposición, suspender o reprogramar si no se puede controlar el riesgo. Considerar límites según tipo de trabajo y aclimatación.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
 
-                <h4 style="margin-top: 12px;">Tabla 3: Límites de exposición (TGBH efectivo, tipo de trabajo y aclimatación)</h4>
-                <table class="protocol-table">
-                    <thead>
-                        <tr><th>Tipo de trabajo</th><th>No aclimatado: valor de acción</th><th>Aclimatado: valor de acción</th><th>Decisión preventiva</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><strong>Ligero</strong></td><td>28 °C</td><td>30 °C</td><td>Al alcanzar el valor aplicable, evaluar y reforzar controles; no asumir que la tarea es segura solo por ser ligera.</td></tr>
-                        <tr><td><strong>Moderado</strong></td><td>25 °C</td><td>28 °C</td><td>Reducir la exposición térmica, organizar pausas y reevaluar la tarea.</td></tr>
-                        <tr><td><strong>Pesado</strong></td><td>23 °C</td><td>26 °C</td><td>Priorizar reducción del esfuerzo, pausas más frecuentes y trabajo en horas menos calurosas; reevaluar antes de continuar.</td></tr>
-                        <tr><td><strong>Muy pesado</strong></td><td>21 °C</td><td>25 °C</td><td>Aplicar controles reforzados desde valores bajos; considerar suspensión o reprogramación si no se puede reducir suficientemente la exposición.</td></tr>
-                    </tbody>
-                </table>
+                <h4 class="table-section-heading">Tabla 2: Factores de Ajuste de Vestimenta / EPP al TGBH (CAV)</h4>
+                <div class="table-responsive-wrap">
+                    <table class="protocol-table">
+                        <thead>
+                            <tr><th>Tipo de Ropa / EPP</th><th>Ajuste TGBH (°C)</th><th>Aplicación Operativa</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Ropa de trabajo convencional (camisa/pantalón), mameluco de tela/algodón o Notex/SMS (1 capa)</td><td><strong>+0 °C</strong></td><td>Referencia estándar (sin recargo adicional).</td></tr>
+                            <tr><td>Mameluco no tejido de poliolefinas / Tyvek (1 capa)</td><td><strong>+2 °C</strong></td><td>Sumar +2 °C al TGBH medido.</td></tr>
+                            <tr><td>Doble capa de tejido (mameluco sobre ropa de trabajo)</td><td><strong>+3 °C</strong></td><td>Sumar +3 °C al TGBH medido.</td></tr>
+                            <tr><td>Mandil largo manga larga impermeable sobre mameluco</td><td><strong>+4 °C</strong></td><td>Sumar +4 °C al TGBH medido.</td></tr>
+                            <tr><td>Mameluco resistente al vapor sin capucha (1 capa) / con capucha (1 capa) / sobre ropa</td><td><strong>+10 a +12 °C</strong></td><td>Alta restricción de evaporación del sudor; requiere controles estrictos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 class="table-section-heading">Tabla 3: Cuadro Operativo — Límites de Exposición (TGBH efectivo, tipo de trabajo y aclimatación)</h4>
+                <div class="table-responsive-wrap">
+                    <table class="protocol-table">
+                        <thead>
+                            <tr><th>Tipo de trabajo</th><th>No aclimatado: valor de acción</th><th>Aclimatado: valor de acción</th><th>Decisión preventiva</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Ligero</strong></td><td>28 °C</td><td>30 °C</td><td>Al alcanzar el valor aplicable, evaluar y reforzar los controles; no asumir que la tarea es segura solo por ser ligera.</td></tr>
+                            <tr><td><strong>Moderado</strong></td><td>25 °C</td><td>28 °C</td><td>Reducir la exposición térmica, organizar pausas y reevaluar la tarea.</td></tr>
+                            <tr><td><strong>Pesado</strong></td><td>23 °C</td><td>26 °C</td><td>Priorizar reducción del esfuerzo, pausas más frecuentes y trabajo en horas menos calurosas; reevaluar antes de continuar.</td></tr>
+                            <tr><td><strong>Muy pesado</strong></td><td>21 °C</td><td>25 °C</td><td>Aplicar controles reforzados desde valores relativamente bajos; considerar la suspensión o reprogramación si no se puede reducir suficientemente la exposición.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 class="table-section-heading">Tabla 4: Matriz de riesgo Índice de Calor (NWS / OSHA)</h4>
+                <div class="table-responsive-wrap">
+                    <table class="protocol-table">
+                        <thead>
+                            <tr><th>Riesgo</th><th>Índice de calor efectivo</th><th>Impacto en la Salud</th><th>Medidas de control</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td class="cell-bajo">Bajo</td><td>26,7 °C a 32,2 °C</td><td>Puede aparecer fatiga con exposición prolongada o esfuerzo físico.</td><td>Mantener agua potable, sombra, vigilancia de síntomas y pausas apropiadas. Considerar carga física y aclimatación.</td></tr>
+                            <tr><td class="cell-medio">Medio</td><td>32,2 °C a 39,4 °C</td><td>Posibles calambres, agotamiento por calor y golpe de calor, especialmente con esfuerzo físico o exposición prolongada.</td><td>Incrementar pausas en lugares frescos, reducir esfuerzo físico y reforzar supervisión. Considerar límites y aclimatación.</td></tr>
+                            <tr><td class="cell-alto">Alto</td><td>39,4 °C a 51,1 °C</td><td>Aumenta considerablemente posibilidad de calambres y agotamiento por calor; puede presentarse golpe de calor.</td><td>Aplicar controles intensificados, reducir duración de exposición y carga física. Considerar límites y aclimatación.</td></tr>
+                            <tr><td class="cell-muy-alto">Muy alto</td><td>51,7 °C o más</td><td>Condiciones de calor extremo, con riesgo muy elevado de enfermedad grave por calor.</td><td>Evitar exposición no controlada, suspender o reprogramar tareas que no puedan ejecutarse con controles eficaces.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="disclaimer-footer">
-                <button type="button" style="background:#0f172a;" onclick="document.getElementById('tablasTermicasModal').style.display='none'">CERRAR TABLAS</button>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL 2: DASHBOARD LINEAMIENTOS TÉCNICOS POR RIESGO (NUMERAL 9 + 11)
+         ========================================================= -->
+    <div id="lineamientosModal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="dashboard-modal-card">
+            <div class="dash-modal-header" style="background:#0f172a;">
+                <div>
+                    <span class="dash-tag">NUMERAL 9 Y NUMERAL 11 • R.M. N.° 341-2026-TR</span>
+                    <h3>📋 Dashboard de Lineamientos Técnicos por Riesgo (13 Riesgos FEN)</h3>
+                </div>
+                <button type="button" class="dash-close-btn" onclick="cerrarModal('lineamientosModal')">&times;</button>
+            </div>
+            <div class="dash-toolbar">
+                <input type="text" id="searchLineamientos" class="dash-search-input" placeholder="Buscar por riesgo, control crítico, EPP o retorno seguro..." oninput="renderizarDashboardLineamientos()">
+                <span id="countLineamientos" class="dash-pill-counter">13 riesgos</span>
+            </div>
+            <div class="dash-modal-body">
+                <div id="lineamientosGrid" class="lineamientos-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL 3: DASHBOARD ANEXO 1 — MATRIZ OPERATIVA MÍNIMA
+         ========================================================= -->
+    <div id="anexo1Modal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="dashboard-modal-card dashboard-modal-xl">
+            <div class="dash-modal-header" style="background:#991b1b;">
+                <div>
+                    <span class="dash-tag" style="color:#fecaca;">NUMERAL 12 • ANEXO 1 • R.M. N.° 341-2026-TR</span>
+                    <h3>📑 Matriz Operativa Mínima de Peligros, Riesgos y Controles (Anexo 1)</h3>
+                </div>
+                <button type="button" class="dash-close-btn" onclick="cerrarModal('anexo1Modal')">&times;</button>
+            </div>
+            <div class="dash-toolbar dash-toolbar-wrap">
+                <select id="filterAnexoPeligro" class="dash-select" onchange="renderizarAnexo1()">
+                    <option value="">Todos los Peligros (13)</option>
+                </select>
+                <select id="filterAnexoFase" class="dash-select" onchange="renderizarAnexo1()">
+                    <option value="">Todas las Fases</option>
+                    <option value="Antes">Antes (Prevención y Preparación)</option>
+                    <option value="Durante">Durante (Respuesta)</option>
+                    <option value="Después">Después (Recuperación)</option>
+                </select>
+                <input type="text" id="searchAnexo1" class="dash-search-input" placeholder="Buscar en controles, EPP, responsable o evidencia..." oninput="renderizarAnexo1()">
+                <button type="button" class="btn-export-excel" onclick="exportarAnexo1Excel()">📥 Exportar Excel</button>
+                <span id="countAnexo1" class="dash-pill-counter">39 registros</span>
+            </div>
+            <div class="dash-modal-body" style="padding: 12px;">
+                <div class="table-responsive-wrap">
+                    <table class="protocol-table anexo-table">
+                        <thead>
+                            <tr>
+                                <th>Fase</th>
+                                <th>Peligro</th>
+                                <th>Riesgo</th>
+                                <th>Controles</th>
+                                <th>Responsable</th>
+                                <th>Criterio de Activación</th>
+                                <th>EPP</th>
+                                <th>Capacitación</th>
+                                <th>Evidencia de Verificación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="anexo1TableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL 4: DEJAR COMENTARIO AL ADMINISTRADOR (PRIVADO)
+         ========================================================= -->
+    <div id="comentarioModal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="disclaimer-card" style="max-width: 480px;">
+            <div class="disclaimer-header" style="background:#0f172a;">
+                <h3>💬 Comentario Directo al Administrador</h3>
+            </div>
+            <div class="disclaimer-body">
+                <p style="font-size:0.8rem; color:#475569;">Envía sugerencias técnicas, reportes de puntos críticos o consultas directamente a <strong>Vladimir Casas Palomino</strong>. Tu mensaje es privado y solo será visible para el administrador.</p>
+                <div class="t-field">
+                    <label for="commentCategory">Categoría:</label>
+                    <select id="commentCategory">
+                        <option value="Sugerencia de mejora">Sugerencia de mejora</option>
+                        <option value="Nuevo Punto Crítico">Reportar nuevo Punto Crítico</option>
+                        <option value="Consulta SST / Protocolo">Consulta SST / Protocolo FEN</option>
+                        <option value="Error técnico">Reportar error técnico</option>
+                    </select>
+                </div>
+                <div class="t-field">
+                    <label for="commentText">Mensaje:</label>
+                    <textarea id="commentText" rows="4" class="comment-textarea" placeholder="Escribe tu comentario aquí..."></textarea>
+                </div>
+                <div id="commentStatusMsg" style="font-size:0.78rem; font-weight:600;"></div>
+            </div>
+            <div class="disclaimer-footer" style="display:flex; justify-content:space-between; gap:8px;">
+                <button type="button" style="background:#64748b;" onclick="cerrarModal('comentarioModal')">Cancelar</button>
+                <button type="button" id="btnEnviarComentario" onclick="enviarComentarioAdmin()">Enviar Comentario</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL 5: BUZÓN PRIVADO DE COMENTARIOS (SOLO ADMINISTRADOR)
+         ========================================================= -->
+    <div id="adminInboxModal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="dashboard-modal-card" style="max-width: 780px;">
+            <div class="dash-modal-header" style="background:#0f172a;">
+                <div>
+                    <span class="dash-tag" style="color:#86efac;">ACCESO EXCLUSIVO ADMINISTRADOR</span>
+                    <h3>🔐 Buzón Privado de Comentarios de Usuarios</h3>
+                </div>
+                <button type="button" class="dash-close-btn" onclick="cerrarModal('adminInboxModal')">&times;</button>
+            </div>
+            <div class="dash-modal-body">
+                <div id="adminInboxList" class="inbox-list">Cargando comentarios...</div>
             </div>
         </div>
     </div>
@@ -408,21 +585,20 @@
                 <h3>📘 Guía Técnica y Base Normativa — Geomapa SST FEN Perú</h3>
             </div>
             <div class="disclaimer-body" style="max-height: 65vh; overflow-y: auto;">
-                <p><strong>1. Módulo Geoespacial (CENEPRED):</strong> Permite consultar distritos, escenarios de inundación, movimientos en masa, cuencas hidrográficas y puntos críticos viales en Lima y Callao.</p>
-                <p><strong>2. Módulo de Estrés Térmico (Numeral 9.1 - R.M. N.° 341-2026-TR):</strong> Integra las dos metodologías oficiales del Protocolo del MTPE:</p>
-                <ul style="padding-left: 18px; line-height: 1.6;">
-                    <li><strong>Índice de Calor (NWS/NOAA):</strong> Herramienta de alerta temprana y seguimiento con temperatura del aire (°C) y humedad relativa (%). Permite añadir hasta +8,3 °C por exposición solar directa.</li>
-                    <li><strong>TGBH Efectivo (R.M. N.° 375-2008-TR):</strong> Evaluación cuantitativa ocupacional combinando TBH, TG, TBS, ajuste por ropa/EPP (Tabla 2), aclimatación y carga metabólica (Tabla 3).</li>
-                </ul>
+                <p><strong>1. Módulo Geoespacial (CENEPRED):</strong> Permite consultar distritos, escenarios de inundación, movimientos en masa, cuencas hidrográficas y puntos críticos viales actualizados en tiempo real en Lima y Callao.</p>
+                <p><strong>2. Módulo de Estrés Térmico (Numeral 9.1 - R.M. N.° 341-2026-TR):</strong> Integra las dos metodologías oficiales del Protocolo MTPE (Índice de Calor NWS/NOAA y TGBH Efectivo R.M. N.° 375-2008-TR) con las Tablas 1, 2, 3 y 4.</p>
+                <p><strong>3. Dashboards Normativos:</strong> Acceso directo desde la barra superior a los <strong>13 Lineamientos Técnicos por Riesgo (Numeral 9)</strong>, <strong>Criterios de Retorno Seguro (Numeral 11)</strong> y la <strong>Matriz Operativa Mínima (Anexo 1)</strong>.</p>
             </div>
             <div class="disclaimer-footer">
-                <button type="button" style="background:#1e293b;" onclick="document.getElementById('normativaModal').style.display='none'">ENTENDIDO, VOLVER AL MAPA</button>
+                <button type="button" style="background:#1e293b;" onclick="cerrarModal('normativaModal')">ENTENDIDO, VOLVER AL MAPA</button>
             </div>
         </div>
     </div>
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- PapaParse para lectura en vivo del CSV de Puntos Críticos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
