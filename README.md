@@ -40,7 +40,7 @@ Permite geolocalizar cualquier centro de trabajo o frente operativo en Lima Metr
 ### ⚠️ Aviso Legal (Disclaimer)
 Esta plataforma tiene fines exclusivamente **técnicos, educativos y referenciales**. La información cartográfica proviene de modelos oficiales a escala regional/distrital y **no sustituye** la Identificación de Peligros, Evaluación de Riesgos y Determinación de Controles (IPERC) específica ni las evaluaciones técnicas que cada empleador debe realizar en su centro de trabajo.
 
-📋 Ficha Técnica y Autoría
+###📋 Ficha Técnica y Autoría
 Desarrollo: Vladimir Casas
 Software GIS de Procesamiento: Civil3D / QGIS / Code
 Actualización del Sistema: Noviembre 2026
