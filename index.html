@@ -156,7 +156,7 @@
                     <div id="puntosCriticosList" class="pc-list-container"></div>
                 </section>
 
-                <!-- SECCIÓN 3: DOCUMENTACIÓN OFICIAL EN CUADRÍCULA 2x2 -->
+                <!-- SECCIÓN 3: DOCUMENTACIÓN OFICIAL Y SUSTENTO TÉCNICO -->
                 <section class="card-section card-compact docs-card">
                     <div class="section-title-row" style="margin-bottom: 5px;">
                         <h3>📂 Documentación Oficial (Repo)</h3>
@@ -166,6 +166,7 @@
                         <a href="documentación/8777346-protocolo-sst-ante-el-fen.pdf" target="_blank" class="doc-grid-btn" title="Protocolo SST ante el FEN (PDF)">📘 Protocolo (PDF)</a>
                         <button type="button" class="doc-grid-btn doc-btn-action" onclick="abrirDashboardLineamientos()" title="Lineamientos Técnicos por Riesgo (Numeral 9)">📋 Riesgos (Num. 9)</button>
                         <button type="button" class="doc-grid-btn doc-btn-action" onclick="abrirDashboardAnexo1()" title="Matriz Operativa Mínima (Anexo 1)">📑 Matriz Anexo 1</button>
+                        <button type="button" class="doc-grid-btn doc-btn-action" style="grid-column: 1 / -1; background: #fef2f2; border-color: #fca5a5; color: #991b1b;" onclick="abrirModalSustento()" title="Ver Informe Técnico de Sustento - Geomapa SST FEN Perú (PDF)">📐 Informe Técnico de Sustento (PDF)</button>
                     </div>
                 </section>
             </div>
@@ -259,7 +260,7 @@
                 <button type="button" class="btn-tables-modal" onclick="abrirModalTablasTermicas()" title="Ver Tablas 1, 2, 3 y 4 del Protocolo">📊 Tablas</button>
             </div>
 
-         <!-- SELECTOR DE MÉTODO DE CÁLCULO -->
+            <!-- SELECTOR DE MÉTODO DE CÁLCULO -->
             <div class="thermal-mode-tabs">
                 <button type="button" class="t-mode-btn" onclick="cambiarModoTermico('tgbh', this)">Opción 1: TGBH Efectivo</button>
                 <button type="button" class="t-mode-btn active" onclick="cambiarModoTermico('hi', this)">Opción 2: Índice de Calor (NWS)</button>
@@ -587,6 +588,29 @@
         </div>
     </div>
 
+    <!-- =========================================================
+         MODAL 6: INFORME TÉCNICO DE SUSTENTO (PDF)
+         ========================================================= -->
+    <div id="sustentoModal" class="modal-overlay-gatekeeper" style="display: none;">
+        <div class="dashboard-modal-card dashboard-modal-xl" style="height: 88vh;">
+            <div class="dash-modal-header" style="background:#0f172a;">
+                <div>
+                    <span class="dash-tag">DOCUMENTO TÉCNICO DE SUSTENTO • ARQUITECTURA CONTECH &amp; WEBGIS</span>
+                    <h3>📐 Informe Técnico de Sustento — Geomapa SST FEN Perú</h3>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <a id="btnAbrirPdfNuevaPestana" href="#" target="_blank" rel="noopener noreferrer" class="btn-tables-modal" style="text-decoration:none;">
+                        ↗ Abrir / Descargar PDF
+                    </a>
+                    <button type="button" class="dash-close-btn" onclick="cerrarModal('sustentoModal')">&times;</button>
+                </div>
+            </div>
+            <div class="dash-modal-body" style="padding: 0; display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <iframe id="visorPdfSustento" src="" title="Informe Técnico de Sustento - Geomapa SST FEN Perú" style="width: 100%; height: 100%; border: none; flex: 1; background: #f1f5f9;"></iframe>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL GUÍA NORMATIVA -->
     <div id="normativaModal" class="modal-overlay-gatekeeper" style="display: none;">
         <div class="disclaimer-card" style="max-width: 720px;">
@@ -597,6 +621,7 @@
                 <p><strong>1. Módulo Geoespacial (CENEPRED):</strong> Permite consultar distritos, escenarios de inundación, movimientos en masa, cuencas hidrográficas y puntos críticos viales actualizados en tiempo real en Lima y Callao.</p>
                 <p><strong>2. Módulo de Estrés Térmico (Numeral 9.1 - R.M. N.° 341-2026-TR):</strong> Integra las dos metodologías oficiales del Protocolo MTPE (Índice de Calor NWS/NOAA y TGBH Efectivo R.M. N.° 375-2008-TR) con las Tablas 1, 2, 3 y 4.</p>
                 <p><strong>3. Dashboards Normativos:</strong> Acceso directo desde la barra superior a los <strong>13 Lineamientos Técnicos por Riesgo (Numeral 9)</strong>, <strong>Criterios de Retorno Seguro (Numeral 11)</strong> y la <strong>Matriz Operativa Mínima (Anexo 1)</strong>.</p>
+                <p><strong>4. Sustento Técnico del Visor Web:</strong> Consulta el documento completo de arquitectura, metodología GIS y respaldo normativo <a href="#" onclick="cerrarModal('normativaModal'); abrirModalSustento(); return false;" style="color:#b91c1c; font-weight:700;">aquí (Informe Técnico de Sustento - PDF)</a>.</p>
                 <p style="border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 0.78rem; color: #475569;"><strong>Autoría y Desarrollo:</strong> Vladimir Casas Palomino • Noviembre 2026.</p>
             </div>
             <div class="disclaimer-footer">
