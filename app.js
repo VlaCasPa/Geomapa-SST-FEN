@@ -1063,8 +1063,23 @@ window.abrirBuzonAdmin = async function() {
 };
 
 // ============================================================================
-// 13. UTILIDADES DE MODALES, MAPA, CAPAS Y MÓVIL
+// 13. INFORME TÉCNICO DE SUSTENTO (PDF) Y UTILIDADES DE MODALES / MAPA / MÓVIL
 // ============================================================================
+const RUTA_INFORME_SUSTENTO_PDF = 'documentación/Informe Técnico de Sustento - Geomapa SST FEN Perú.pdf';
+
+window.abrirModalSustento = function() {
+    const modal = document.getElementById('sustentoModal');
+    const iframe = document.getElementById('visorPdfSustento');
+    const linkExt = document.getElementById('btnAbrirPdfNuevaPestana');
+    const urlCodificada = encodeURI(RUTA_INFORME_SUSTENTO_PDF);
+
+    if (linkExt) linkExt.href = urlCodificada;
+    if (iframe && iframe.getAttribute('src') !== urlCodificada) {
+        iframe.setAttribute('src', urlCodificada);
+    }
+    if (modal) modal.style.display = 'flex';
+};
+
 window.abrirModalTablasTermicas = function() {
     document.getElementById('tablasTermicasModal').style.display = 'flex';
 };
