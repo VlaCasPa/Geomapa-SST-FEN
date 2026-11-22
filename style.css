@@ -89,9 +89,30 @@ body, html {
 }
 .btn-google-login:hover { background: #f8fafc; border-color: var(--slate-800); }
 
+/* INDICADOR DE IMPACTO EN PORTADA */
+.gk-impact-strip {
+    margin-top: 14px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    padding: 5px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--slate-800);
+}
+.gk-impact-strip strong {
+    color: var(--mtpe-red);
+    font-weight: 800;
+}
+.gk-dot {
+    color: #94a3b8;
+}
+
 /* CRÉDITOS DESTACADOS EN VENTANA INICIAL */
 .gatekeeper-author-box {
-    margin-top: 18px;
+    margin-top: 14px;
     padding-top: 14px;
     border-top: 1px solid var(--slate-200);
     display: flex;
@@ -297,6 +318,34 @@ body, html {
 .inbox-cat { background: #e2e8f0; color: var(--slate-900); font-weight: 700; padding: 2px 7px; border-radius: 4px; }
 .inbox-msg { font-size: 0.83rem; color: var(--slate-900); line-height: 1.5; white-space: pre-wrap; }
 
+/* TARJETAS DE IMPACTO PARA PANEL ADMINISTRADOR */
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.admin-stat-box {
+    background: #f8fafc;
+    border: 1px solid var(--slate-200);
+    border-top: 3px solid var(--mtpe-red);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+.stat-box-title {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--slate-600);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.stat-box-num {
+    font-size: 1.45rem;
+    color: var(--slate-900);
+    font-weight: 800;
+}
+
 /* =========================================================
    BARRA SUPERIOR DE NAVEGACIÓN
    ========================================================= */
@@ -377,7 +426,7 @@ body, html {
     overflow: hidden;
 }
 
-/* COLUMNA 1: IZQUIERDA ULTRA-COMPACTA CON PIE DE AUTORÍA FIJO */
+/* COLUMNA 1: IZQUIERDA ULTRA-COMPACTA CON PIE DE AUTORÍA Y CONTADOR FIJO */
 .col-left {
     width: 280px;
     flex-shrink: 0;
@@ -411,7 +460,7 @@ body, html {
 }
 .card-pc-flex {
     flex: 1;
-    min-height: 110px;
+    min-height: 100px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -484,21 +533,49 @@ body, html {
 .doc-grid-btn:hover { border-color: var(--mtpe-red); color: var(--mtpe-red); }
 .doc-btn-action { background: #f1f5f9; border-color: #94a3b8; }
 
-/* PIE DE AUTORÍA FIJO SIEMPRE VISIBLE */
+/* PIE FIJO SIEMPRE VISIBLE: CONTADOR DE IMPACTO Y AUTORÍA */
 .author-footer-fixed {
     flex-shrink: 0;
     background: var(--slate-900);
     border-top: 2px solid var(--mtpe-red);
-    padding: 8px 10px;
+    padding: 7px 10px 8px 10px;
     color: #ffffff;
 }
+
+.impact-metrics-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-bottom: 6px;
+}
+.metric-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 5px;
+    padding: 3px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.66rem;
+}
+.metric-label {
+    color: #cbd5e1;
+    font-weight: 600;
+}
+.metric-val {
+    color: #fde047;
+    font-weight: 800;
+    font-size: 0.72rem;
+}
+
 .author-credit {
     text-align: center;
     margin-bottom: 6px;
 }
 .author-prefix {
     display: block;
-    font-size: 0.66rem;
+    font-size: 0.65rem;
     color: #94a3b8;
     font-weight: 600;
     line-height: 1.2;
@@ -727,4 +804,5 @@ body, html {
 
     .diagnostic-floating-card { width: calc(100% - 20px); left: 10px; bottom: 10px; max-height: 65%; }
     .dashboard-modal-card { width: 100%; max-height: 94vh; }
+    .admin-stats-grid { grid-template-columns: 1fr; }
 }
