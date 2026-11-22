@@ -26,6 +26,13 @@
                 Continuar con cuenta de Google
             </button>
 
+            <!-- INDICADOR DE IMPACTO EN PORTADA -->
+            <div class="gk-impact-strip" title="Métricas acumuladas en tiempo real">
+                <span>👁️ <strong id="gkVisitCount">—</strong> visitas</span>
+                <span class="gk-dot">•</span>
+                <span>👷 <strong id="gkUserCount">—</strong> especialistas SST</span>
+            </div>
+
             <div class="gatekeeper-author-box">
                 <span class="gk-author-label">Geomapa desarrollado por:</span>
                 <strong class="gk-author-name">Vladimir Casas Palomino</strong>
@@ -96,7 +103,7 @@
     <!-- ESPACIO DE TRABAJO DE 3 COLUMNAS -->
     <div class="workspace-3col">
         
-        <!-- COLUMNA 1 (IZQUIERDA): COMPACTA SIN SCROLL GENERAL + AUTORÍA SIEMPRE VISIBLE -->
+        <!-- COLUMNA 1 (IZQUIERDA): COMPACTA SIN SCROLL GENERAL + AUTORÍA Y MÉTRICAS SIEMPRE VISIBLES -->
         <aside id="colLeft" class="col-left">
             <div class="col-left-body">
                 <!-- SECCIÓN 1: CAPAS TEMÁTICAS -->
@@ -171,8 +178,20 @@
                 </section>
             </div>
 
-            <!-- PIE FIJO SIEMPRE VISIBLE: AUTORÍA Y COMENTARIOS PRIVADOS -->
+            <!-- PIE FIJO SIEMPRE VISIBLE: CONTADOR DE IMPACTO, AUTORÍA Y COMENTARIOS PRIVADOS -->
             <footer class="author-footer-fixed">
+                <!-- CONTADOR DE VISITAS E IMPACTO EN TIEMPO REAL -->
+                <div class="impact-metrics-bar" title="Métricas de alcance e impacto del portal">
+                    <div class="metric-chip">
+                        <span class="metric-label">👁️ Visitas:</span>
+                        <strong id="totalVisitsCounter" class="metric-val">...</strong>
+                    </div>
+                    <div class="metric-chip">
+                        <span class="metric-label">👥 Usuarios SST:</span>
+                        <strong id="totalUsersCounter" class="metric-val">...</strong>
+                    </div>
+                </div>
+
                 <div class="author-credit">
                     <span class="author-prefix">Geomapa desarrollado por:</span>
                     <strong class="author-fullname">Vladimir Casas Palomino</strong>
@@ -571,18 +590,34 @@
     </div>
 
     <!-- =========================================================
-         MODAL 5: BUZÓN PRIVADO DE COMENTARIOS (SOLO ADMINISTRADOR)
+         MODAL 5: BUZÓN PRIVADO DE COMENTARIOS Y ESTADÍSTICAS (SOLO ADMINISTRADOR)
          ========================================================= -->
     <div id="adminInboxModal" class="modal-overlay-gatekeeper" style="display: none;">
         <div class="dashboard-modal-card" style="max-width: 780px;">
             <div class="dash-modal-header" style="background:#0f172a;">
                 <div>
                     <span class="dash-tag" style="color:#86efac;">ACCESO EXCLUSIVO ADMINISTRADOR</span>
-                    <h3>🔐 Buzón Privado de Comentarios de Usuarios</h3>
+                    <h3>🔐 Panel de Impacto y Buzón Privado de Usuarios</h3>
                 </div>
                 <button type="button" class="dash-close-btn" onclick="cerrarModal('adminInboxModal')">&times;</button>
             </div>
             <div class="dash-modal-body">
+                <!-- RESUMEN DE IMPACTO PARA EL ADMINISTRADOR -->
+                <div class="admin-stats-grid" id="adminStatsSummary">
+                    <div class="admin-stat-box">
+                        <span class="stat-box-title">👁️ Visitas Totales al Portal</span>
+                        <strong class="stat-box-num" id="adminStatVisits">—</strong>
+                    </div>
+                    <div class="admin-stat-box">
+                        <span class="stat-box-title">👥 Especialistas Registrados</span>
+                        <strong class="stat-box-num" id="adminStatUsers">—</strong>
+                    </div>
+                    <div class="admin-stat-box">
+                        <span class="stat-box-title">📍 Consultas Territoriales</span>
+                        <strong class="stat-box-num" id="adminStatQueries">—</strong>
+                    </div>
+                </div>
+                <h4 class="table-section-heading" style="margin-bottom: 10px;">Mensajes Recibidos</h4>
                 <div id="adminInboxList" class="inbox-list">Cargando comentarios...</div>
             </div>
         </div>
