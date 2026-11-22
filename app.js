@@ -6,7 +6,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, serverTimestamp, increment, onSnapshot, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // --- 1. CONFIGURACIÓN FIREBASE Y ADMINISTRADOR ---
 const firebaseConfig = {
@@ -36,6 +36,89 @@ function esAdministrador(user) {
     if (!user || !user.email) return false;
     return ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(user.email.toLowerCase().trim());
 }
+
+// ============================================================================
+// CONTADOR DE VISITAS E IMPACTO EN TIEMPO REAL (FIRESTORE)
+// ============================================================================
+function actualizarUIContadores(visitas, usuarios) {
+    const vFormat = typeof visitas === 'number' ? visitas.toLocaleString('es-PE') : visitas;
+    const uFormat = typeof usuarios === 'number' ? usuarios.toLocaleString('es-PE') : usuarios;
+
+    const elSidebarVisits = document.getElementById('totalVisitsCounter');
+    const elSidebarUsers = document.getElementById('totalUsersCounter');
+    const elGkVisits = document.getElementById('gkVisitCount');
+    const elGkUsers = document.getElementById('gkUserCount');
+    const elAdminVisits = document.getElementById('adminStatVisits');
+    const elAdminUsers = document.getElementById('adminStatUsers');
+
+    if (elSidebarVisits && vFormat !== undefined) elSidebarVisits.textContent = vFormat;
+    if (elSidebarUsers && uFormat !== undefined) elSidebarUsers.textContent = uFormat;
+    if (elGkVisits && vFormat !== undefined) elGkVisits.textContent = vFormat;
+    if (elGkUsers && uFormat !== undefined) elGkUsers.textContent = uFormat;
+    if (elAdminVisits && vFormat !== undefined) elAdminVisits.textContent = vFormat;
+    if (elAdminUsers && uFormat !== undefined) elAdminUsers.textContent = uFormat;
+}
+
+function iniciarMonitorImpacto() {
+    const refGlobal = doc(db, "metricas", "global");
+
+    // Escuchar actualizaciones en vivo del documento de métricas globales
+    onSnapshot(refGlobal, (snap) => {
+        if (snap.exists()) {
+            const data = snap.data();
+            actualizarUIContadores(data.visitasTotales || 1, data.usuariosUnicos || 1);
+        } else {
+            actualizarUIContadores(1, 1);
+        }
+    }, (err) => {
+        console.warn("Esperando permisos de lectura de métricas:", err.message);
+    });
+}
+
+async function registrarVisitaYUsuario(user) {
+    const refGlobal = doc(db, "metricas", "global");
+    const refUsuario = doc(db, "usuarios", user.uid);
+
+    // 1. Registrar visita única por sesión de navegador (evita duplicados por F5)
+    if (!sessionStorage.getItem('geomapa_visita_registrada')) {
+        sessionStorage.setItem('geomapa_visita_registrada', 'true');
+        try {
+            await setDoc(refGlobal, {
+                visitasTotales: increment(1),
+                ultimaVisita: serverTimestamp()
+            }, { merge: true });
+        } catch (e) {
+            console.warn("No se pudo incrementar contador de visitas:", e.message);
+        }
+    }
+
+    // 2. Verificar si es un especialista nuevo para incrementar usuarios únicos
+    try {
+        const userSnap = await getDoc(refUsuario);
+        if (!userSnap.exists()) {
+            await setDoc(refUsuario, {
+                email: user.email,
+                nombre: user.displayName || "Especialista SST",
+                primerAcceso: serverTimestamp(),
+                ultimoAcceso: serverTimestamp(),
+                totalSesiones: 1
+            }, { merge: true });
+
+            await setDoc(refGlobal, {
+                usuariosUnicos: increment(1)
+            }, { merge: true });
+        } else {
+            await setDoc(refUsuario, {
+                ultimoAcceso: serverTimestamp(),
+                totalSesiones: increment(1)
+            }, { merge: true });
+        }
+    } catch (e) {
+        console.warn("Error registrando perfil de usuario:", e.message);
+    }
+}
+
+iniciarMonitorImpacto();
 
 // --- 2. AUTENTICACIÓN Y GOBERNANZA ---
 window.loginConGoogle = async function() {
@@ -86,6 +169,9 @@ onAuthStateChanged(auth, async (user) => {
         if (loginModal) loginModal.style.display = 'none';
         if (userBadge) userBadge.textContent = `🟢 ${user.displayName || user.email}`;
         if (btnAdminInbox) btnAdminInbox.style.display = esAdministrador(user) ? 'block' : 'none';
+
+        // Contabilizar visita e impacto del profesional autenticado
+        registrarVisitaYUsuario(user);
 
         let aceptado = sessionStorage.getItem('geomapa_disclaimer_ok') === 'true';
         if (!aceptado) {
@@ -1032,6 +1118,16 @@ window.abrirBuzonAdmin = async function() {
     const list = document.getElementById('adminInboxList');
     modal.style.display = 'flex';
     list.innerHTML = 'Cargando mensajes privados...';
+
+    // Cargar conteo de consultas territoriales para el panel ejecutivo del administrador
+    try {
+        const countSnap = await getCountFromServer(collection(db, "consultas_mapa"));
+        const elQueries = document.getElementById('adminStatQueries');
+        if (elQueries) elQueries.textContent = countSnap.data().count.toLocaleString('es-PE');
+    } catch (e) {
+        const elQueries = document.getElementById('adminStatQueries');
+        if (elQueries) elQueries.textContent = '—';
+    }
 
     try {
         const q = query(collection(db, "comentarios_admin"), orderBy("fecha", "desc"));
