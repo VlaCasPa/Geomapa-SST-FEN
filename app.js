@@ -1,7 +1,6 @@
 // ============================================================================
-// GEOMAPA SST FEN PERÚ — VISOR GEOESPACIAL, ESTRÉS TÉRMICO Y PROTOCOLO MTPE
+// GEOMAPA SST FEN PERÚ v1.0 — ARQUITECTURA MODULAR (CENEPRED & R.M. 341-2026-TR)
 // Desarrollado por: Vladimir Casas Palomino
-// Base Normativa: Protocolo SST ante el Fenómeno El Niño (R.M. N.° 341-2026-TR)
 // ============================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -19,7 +18,6 @@ const firebaseConfig = {
     measurementId: "G-NYXBLLZNH1"
 };
 
-// COLOCA AQUÍ TU CORREO EXACTAMENTE COMO APARECE EN TU CUENTA DE GOOGLE
 const ADMIN_EMAILS = [
     "vlacaspa@gmail.com",
     "tu_correo_admin@gmail.com"
@@ -31,11 +29,56 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 let currentUser = null;
+let moduloPrincipalActivo = 'cenepred';
 
 function esAdministrador(user) {
     if (!user || !user.email) return false;
     return ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(user.email.toLowerCase().trim());
 }
+
+// ============================================================================
+// CONTROL DE LOS 2 MÓDULOS PRINCIPALES (CENEPRED vs NORMATIVA R.M. 341-2026-TR)
+// ============================================================================
+window.cambiarModuloPrincipal = function(modulo) {
+    moduloPrincipalActivo = modulo;
+    document.body.setAttribute('data-active-module', modulo);
+
+    const btnCenepred = document.getElementById('btnModCenepred');
+    const btnNormativa = document.getElementById('btnModNormativa');
+    const panelCenepred = document.getElementById('panelModuloCenepred');
+    const panelNormativa = document.getElementById('panelModuloNormativa');
+    const mapHintText = document.getElementById('mapHintText');
+    const mobTabPanel = document.getElementById('mobTabPanel');
+
+    if (modulo === 'cenepred') {
+        btnCenepred?.classList.add('active');
+        btnNormativa?.classList.remove('active');
+        if (panelCenepred) panelCenepred.style.display = 'flex';
+        if (panelNormativa) panelNormativa.style.display = 'none';
+        if (mapHintText) {
+            mapHintText.innerHTML = '💡 <strong>Módulo 1 (CENEPRED):</strong> Activa capas o toca el mapa para evaluar escenarios de inundación y huaycos.';
+        }
+        if (mobTabPanel) mobTabPanel.textContent = '🗺️ Capas CENEPRED';
+        if (window.innerWidth <= 1024) cambiarVistaMovil('mapa');
+    } else {
+        btnNormativa?.classList.add('active');
+        btnCenepred?.classList.remove('active');
+        if (panelCenepred) panelCenepred.style.display = 'none';
+        if (panelNormativa) panelNormativa.style.display = 'flex';
+        if (mapHintText) {
+            mapHintText.innerHTML = '⚖️ <strong>Módulo 2 (R.M. 341-2026-TR):</strong> Toca cualquier punto para sincronizar el clima en la calculadora térmica derecha y consultar el Protocolo.';
+        }
+        if (mobTabPanel) mobTabPanel.textContent = '📋 Protocolo 341';
+        if (window.innerWidth <= 1024) cambiarVistaMovil('capas');
+    }
+
+    setTimeout(() => map.invalidateSize(), 200);
+};
+
+window.abrirModalCenepredSustento = function() {
+    const modal = document.getElementById('cenepredSustentoModal');
+    if (modal) modal.style.display = 'flex';
+};
 
 // ============================================================================
 // CONTADOR DE VISITAS E IMPACTO EN TIEMPO REAL (FIRESTORE)
@@ -61,8 +104,6 @@ function actualizarUIContadores(visitas, usuarios) {
 
 function iniciarMonitorImpacto() {
     const refGlobal = doc(db, "metricas", "global");
-
-    // Escuchar actualizaciones en vivo del documento de métricas globales
     onSnapshot(refGlobal, (snap) => {
         if (snap.exists()) {
             const data = snap.data();
@@ -79,7 +120,6 @@ async function registrarVisitaYUsuario(user) {
     const refGlobal = doc(db, "metricas", "global");
     const refUsuario = doc(db, "usuarios", user.uid);
 
-    // 1. Registrar visita única por sesión de navegador (evita duplicados por F5)
     if (!sessionStorage.getItem('geomapa_visita_registrada')) {
         sessionStorage.setItem('geomapa_visita_registrada', 'true');
         try {
@@ -87,12 +127,9 @@ async function registrarVisitaYUsuario(user) {
                 visitasTotales: increment(1),
                 ultimaVisita: serverTimestamp()
             }, { merge: true });
-        } catch (e) {
-            console.warn("No se pudo incrementar contador de visitas:", e.message);
-        }
+        } catch (e) {}
     }
 
-    // 2. Verificar si es un especialista nuevo para incrementar usuarios únicos
     try {
         const userSnap = await getDoc(refUsuario);
         if (!userSnap.exists()) {
@@ -113,9 +150,7 @@ async function registrarVisitaYUsuario(user) {
                 totalSesiones: increment(1)
             }, { merge: true });
         }
-    } catch (e) {
-        console.warn("Error registrando perfil de usuario:", e.message);
-    }
+    } catch (e) {}
 }
 
 iniciarMonitorImpacto();
@@ -170,7 +205,6 @@ onAuthStateChanged(auth, async (user) => {
         if (userBadge) userBadge.textContent = `🟢 ${user.displayName || user.email}`;
         if (btnAdminInbox) btnAdminInbox.style.display = esAdministrador(user) ? 'block' : 'none';
 
-        // Contabilizar visita e impacto del profesional autenticado
         registrarVisitaYUsuario(user);
 
         let aceptado = sessionStorage.getItem('geomapa_disclaimer_ok') === 'true';
@@ -202,7 +236,7 @@ const map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 1
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
 const googleGrisLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-    attribution: '&copy; Google Maps | Cartografía: CENEPRED | Protocolo: MTPE R.M. N.° 341-2026-TR',
+    attribution: '&copy; Google Maps | Cartografía: CENEPRED (SIGRID 22169) | Protocolo: MTPE R.M. N.° 341-2026-TR',
     maxZoom: 20,
     className: 'mapa-google-gris'
 }).addTo(map);
@@ -240,7 +274,7 @@ function getTextColor(nivel) {
     return obtenerNivelEstandar(nivel) === 'MEDIO' ? '#0f172a' : '#ffffff';
 }
 
-// --- 5. CAPAS VECTORIALES Y RÁSTER (APAGADAS AL INICIO) ---
+// --- 5. CAPAS VECTORIALES Y RÁSTER ---
 const baseUrl = 'datos_vectoriales/';
 let geoDistritos = null, geoInundacion = null, geoHuaycos = null;
 let layerDistritos = null, layerInundacion = null, layerHuaycos = null, layerRios = null;
@@ -465,8 +499,7 @@ function sincronizarPuntosCriticosCSV() {
                 filtrarPuntosCriticos();
             }
         },
-        error: function(err) {
-            console.warn("Usando respaldo local de Puntos Críticos:", err);
+        error: function() {
             renderizarPuntosCriticos();
         }
     });
@@ -581,7 +614,7 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
 
     const pinIcon = L.divIcon({
         className: 'query-pin-icon',
-        html: `<div style="background:#0f172a; color:#fff; width:30px; height:30px; border-radius:50%; border:3px solid #b91c1c; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:0 4px 12px rgba(0,0,0,0.45);">📍</div>`,
+        html: `<div style="background:#0f172a; color:#fff; width:30px; height:30px; border-radius:50%; border:3px solid #0284c7; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:0 4px 12px rgba(0,0,0,0.45);">📍</div>`,
         iconSize: [30, 30],
         iconAnchor: [15, 15]
     });
@@ -651,6 +684,7 @@ async function evaluarPuntoEnMapa(lat, lng, opciones = {}) {
                 distrito: distritoDetectado,
                 nivelInundacion: valInun.textContent,
                 nivelMovMasas: valHuay.textContent,
+                modulo: moduloPrincipalActivo,
                 fecha: serverTimestamp()
             });
         } catch (e) {}
@@ -664,7 +698,7 @@ window.cerrarDiagnostico = function() {
 window.copiarDiagnosticoSST = function() {
     if (!ultimoDiagnostico) return;
     const texto = [
-        `DIAGNÓSTICO TERRITORIAL SST — FENÓMENO EL NIÑO (R.M. N.° 341-2026-TR)`,
+        `DIAGNÓSTICO TERRITORIAL SST — FENÓMENO EL NIÑO (CENEPRED SIGRID 22169 / R.M. N.° 341-2026-TR)`,
         `Fecha/Hora: ${ultimoDiagnostico.fecha}`,
         `Ubicación: ${ultimoDiagnostico.distrito} (${ultimoDiagnostico.lat.toFixed(5)}, ${ultimoDiagnostico.lng.toFixed(5)})`,
         `Susceptibilidad Inundación (CENEPRED): ${ultimoDiagnostico.nivelInun}`,
@@ -1102,7 +1136,6 @@ window.enviarComentarioAdmin = async function() {
             btn.disabled = false;
         }, 1400);
     } catch (e) {
-        console.error("Error al guardar comentario:", e);
         status.style.color = '#b91c1c';
         status.textContent = '⚠️ No se pudo enviar. Verifica las reglas de Firestore para comentarios_admin.';
         btn.disabled = false;
@@ -1119,7 +1152,6 @@ window.abrirBuzonAdmin = async function() {
     modal.style.display = 'flex';
     list.innerHTML = 'Cargando mensajes privados...';
 
-    // Cargar conteo de consultas territoriales para el panel ejecutivo del administrador
     try {
         const countSnap = await getCountFromServer(collection(db, "consultas_mapa"));
         const elQueries = document.getElementById('adminStatQueries');
@@ -1153,7 +1185,6 @@ window.abrirBuzonAdmin = async function() {
         });
         list.innerHTML = html;
     } catch (e) {
-        console.error("Error leyendo buzón admin:", e);
         list.innerHTML = '<p style="color:#b91c1c;">Error al leer los comentarios. Asegúrate de haber publicado la regla de Firestore para tu correo de administrador.</p>';
     }
 };
